@@ -304,7 +304,13 @@ $("extra").value = recall("watchlink.extra");
 (async () => {
   const s = $("support");
   if (!window.isSecureContext) { s.textContent = "Bluetooth needs a secure (https) page. Open this from GitHub Pages, not as a local file."; s.hidden = false; $("connectBtn").disabled = true; $("allBtn").disabled = true; return; }
-  if (!navigator.bluetooth) { s.textContent = "This browser can't use Bluetooth. Open this page in Chrome on Android (iPhone browsers don't support it)."; s.hidden = false; $("connectBtn").disabled = true; $("allBtn").disabled = true; return; }
+  if (!navigator.bluetooth) {
+    // iPadOS reports itself as a Mac, so also check for a touch screen.
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+    s.innerHTML = ios
+      ? "Safari and Chrome on iPad and iPhone can't use Bluetooth, because Apple doesn't allow it in web pages. Install the free <b>Bluefy – Web BLE Browser</b> app from the App Store, then open this page in Bluefy. Or use Chrome on an Android phone."
+      : "This browser can't use Bluetooth. Open this page in Chrome on Android or on a computer, or in Bluefy on iPad and iPhone.";
+    s.hidden = false; $("connectBtn").disabled = true; $("allBtn").disabled = true; return; }
   try { if (!(await navigator.bluetooth.getAvailability())) { s.textContent = "Bluetooth looks off or unavailable. Turn it on and reload."; s.hidden = false; } } catch (_) {}
 })();
 </script>
