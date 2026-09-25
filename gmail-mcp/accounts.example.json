@@ -1,0 +1,15 @@
+{
+  "default_account": "personal",
+  "accounts": {
+    "personal": {
+      "email": "you@gmail.com",
+      "token_file": "tokens/personal.json",
+      "allowed_recipients": ["you@gmail.com"]
+    },
+    "work": {
+      "email": "you@yourcompany.com",
+      "token_file": "tokens/work.json",
+      "allowed_recipients": []
+    }
+  }
+}

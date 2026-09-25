@@ -1,0 +1,429 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Wrist Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --sunk:#E8ECF2; --ink:#131A26; --muted:#5B6678; --line:#D6DCE6;
+  --accent:#3350E0; --accent-ink:#FFFFFF;
+  --sleep:#6A4FD8; --steps:#12915F; --hr:#D23A4E; --load:#C77A0A;
+  --good:#12915F; --warn:#B8740A; --bad:#C8363F;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0D121B; --surface:#161D2A; --sunk:#1E2736; --ink:#E7ECF4; --muted:#95A1B5; --line:#2A3548;
+    --accent:#7F95FF; --accent-ink:#0D121B;
+    --sleep:#A794FF; --steps:#43C98E; --hr:#FF7A8A; --load:#F0AE45;
+    --good:#43C98E; --warn:#F0AE45; --bad:#FF7A8A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0D121B; --surface:#161D2A; --sunk:#1E2736; --ink:#E7ECF4; --muted:#95A1B5; --line:#2A3548;
+  --accent:#7F95FF; --accent-ink:#0D121B;
+  --sleep:#A794FF; --steps:#43C98E; --hr:#FF7A8A; --load:#F0AE45;
+  --good:#43C98E; --warn:#F0AE45; --bad:#FF7A8A;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--body);padding:0 16px;padding-block:28px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:28px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(28px,5vw,40px);letter-spacing:-.01em}
+h2{font-size:21px}
+h3{font-size:16px}
+.eyebrow{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+header p{margin:6px 0 0;max-width:60ch;color:var(--muted)}
+.status{font:500 12px/1 var(--mono);padding:7px 10px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.status.example{background:color-mix(in srgb,var(--load) 16%,transparent);color:var(--load)}
+
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media (max-width:860px){.tiles{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:440px){.tiles{grid-template-columns:1fr}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:6px}
+.tile .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tile .val{font:600 30px/1 var(--display);font-variant-numeric:tabular-nums}
+.tile .val small{font:500 13px var(--mono);color:var(--muted);margin-left:4px}
+.tile .sub{font:400 12.5px/1.4 var(--body);color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px;vertical-align:1px}
+.pill{font:500 11px/1 var(--mono);padding:5px 8px;border-radius:999px;white-space:nowrap}
+.pill.good{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 17%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+.pill.none{background:var(--sunk);color:var(--muted)}
+svg.spark{width:100%;height:42px;display:block;overflow:visible}
+
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:20px;align-items:start}
+@media (max-width:860px){.cols{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;gap:16px}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+
+form{display:grid;gap:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:440px){.grid2{grid-template-columns:1fr}}
+label{display:grid;gap:5px;font:500 12.5px var(--body);color:var(--muted)}
+input,select,textarea{font:400 15px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+input[type=number]{font-family:var(--mono)}
+textarea{resize:vertical;min-height:56px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+fieldset{border:0;padding:0;margin:0;display:grid;gap:10px}
+legend{padding:0;margin-bottom:8px}
+.btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:600 14px var(--body);border-radius:10px;padding:10px 16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button:disabled{opacity:.55;cursor:not-allowed}
+.msg{font-size:13px;color:var(--muted)}
+
+.charts{display:grid;gap:18px}
+.chart h3{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;font-family:var(--body);font-weight:600}
+.chart svg{width:100%;height:120px;display:block}
+.chart text{font:10.5px var(--mono);fill:var(--muted)}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:640px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child,th:nth-child(7),td:nth-child(7){text-align:left}
+th{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--sunk)}
+td{font:400 13.5px var(--mono)}
+tr:last-child td{border-bottom:0}
+td button{padding:4px 9px;font-size:12px}
+
+.read{white-space:pre-wrap;font-size:14.5px;line-height:1.6;max-width:72ch;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-height:60px}
+
+.guide{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:860px){.guide{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:540px){.guide{grid-template-columns:1fr}}
+details{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:8px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--mono);color:var(--muted)}
+details[open] summary::after{content:"–"}
+details ul,details ol{margin:10px 0 0;padding-left:18px;font-size:14px;color:var(--ink)}
+details li{margin:4px 0}
+.note{font-size:12.5px;color:var(--muted);max-width:75ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Noise watch · daily log</div>
+      <h1>Wrist Log</h1>
+      <p>Copy each day's numbers from NoiseFit into the form. The page tracks your 7-day trends against targets, and Claude can read the log to give you a weekly review.</p>
+    </div>
+    <span class="status" id="status">Connecting…</span>
+  </header>
+
+  <section class="tiles" id="tiles" aria-label="Last 7 days"></section>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="logH">
+      <div class="panel-head"><h2 id="logH">Log a day</h2><span class="eyebrow">from NoiseFit</span></div>
+      <form id="f" novalidate>
+        <label>Date<input type="date" id="date" required></label>
+        <fieldset>
+          <legend class="eyebrow">Sleep · Noise Health</legend>
+          <div class="grid2">
+            <label>Total sleep (hrs)<input type="number" id="sleep" step="0.1" min="0" max="16" placeholder="7.2"></label>
+            <label>Deep sleep (min)<input type="number" id="deep" min="0" max="400" placeholder="75"></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="eyebrow">Activity &amp; vitals</legend>
+          <div class="grid2">
+            <label>Steps<input type="number" id="steps" min="0" max="100000" placeholder="8200"></label>
+            <label>Resting heart rate (bpm)<input type="number" id="rhr" min="30" max="130" placeholder="66"></label>
+            <label>SpO2 (%)<input type="number" id="spo2" min="80" max="100" placeholder="97"></label>
+            <label>Stress (0–100)<input type="number" id="stress" min="0" max="100" placeholder="38"></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="eyebrow">Workout · Sport</legend>
+          <div class="grid2">
+            <label>Type<select id="wtype">
+              <option value="">None / rest day</option>
+              <option>Upper body (dumbbells)</option>
+              <option>Lower body (dumbbells)</option>
+              <option>Walk</option><option>Run</option><option>Football</option><option>Cycling</option><option>Yoga</option><option>Other</option>
+            </select></label>
+            <label>Duration (min)<input type="number" id="wmin" min="0" max="400" placeholder="40"></label>
+            <label>Avg heart rate (bpm)<input type="number" id="whr" min="40" max="220" placeholder="128"></label>
+            <label>Calories (kcal)<input type="number" id="wcal" min="0" max="3000" placeholder="260"></label>
+          </div>
+        </fieldset>
+        <label>Notes<textarea id="notes" placeholder="Late dinner, slept at 1:30, sore legs…"></textarea></label>
+        <div class="btns">
+          <button class="primary" type="submit" id="saveBtn">Save day</button>
+          <span class="msg" id="formMsg" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="trendH">
+      <div class="panel-head"><h2 id="trendH">Last 14 days</h2><span class="eyebrow" id="rangeLbl"></span></div>
+      <div class="charts" id="charts"></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="readH">
+    <div class="panel-head">
+      <h2 id="readH">Weekly read</h2>
+      <div class="btns"><button class="primary" id="readBtn" type="button">Get my weekly read</button></div>
+    </div>
+    <div class="read" id="readOut">Ask Claude for a review of your last 14 days: sleep consistency, activity, recovery, and one or two things to change this week. You can also ask in the chat anytime, since Claude can read this log there too.</div>
+    <p class="note">This is general wellness guidance, not medical advice. For readings that stay unusual, such as SpO2 regularly below 94% or resting heart rate climbing for days, check with a doctor.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="histH">
+    <div class="panel-head"><h2 id="histH">History</h2><span class="eyebrow" id="countLbl"></span></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Date</th><th>Sleep h</th><th>Deep min</th><th>Steps</th><th>RHR</th><th>SpO2</th><th>Workout</th><th>Stress</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="guideH">
+    <div class="panel-head"><h2 id="guideH">Get more from the watch</h2><span class="eyebrow">features &amp; fixes</span></div>
+    <div class="guide">
+      <details open><summary>Noise Health</summary><ul>
+        <li>Turn on 24/7 heart rate and SpO2 in NoiseFit → Device → Health monitoring. Without them, resting HR is estimated from fewer readings.</li>
+        <li>Wear it snug, a finger's width above the wrist bone, especially at night. Loose straps give poor sleep and SpO2 readings.</li>
+        <li>Sleep data syncs when you open NoiseFit in the morning. Log it then.</li>
+      </ul></details>
+      <details><summary>Sport</summary><ul>
+        <li>Start a session for dumbbell days (Strength or Free training) so heart rate and duration are recorded.</li>
+        <li>For walks and runs, use connected GPS in NoiseFit (phone GPS) if the watch has no built-in GPS.</li>
+        <li>Set the auto-pause and HR zone alerts in the workout settings.</li>
+      </ul></details>
+      <details><summary>Breathe</summary><ul>
+        <li>Use a 1–2 minute session when the stress reading is high, or before bed to wind down.</li>
+        <li>Slow breathing at about 6 breaths per minute is what the guide paces you to.</li>
+        <li>Check the stress reading again 10 minutes later and see if it has dropped.</li>
+      </ul></details>
+      <details><summary>Noise Buzz (calls)</summary><ul>
+        <li>Pair the watch's calling Bluetooth separately. It appears as a second device in your phone's Bluetooth list.</li>
+        <li>Add up to about 8–10 favourite contacts in NoiseFit so you can dial them from the watch.</li>
+        <li>If call audio drops, forget both Bluetooth entries and pair again from NoiseFit.</li>
+      </ul></details>
+      <details><summary>AI voice</summary><ul>
+        <li>It uses your phone's connection through NoiseFit, so the app must be open or running in the background.</li>
+        <li>Good for quick questions, timers, and reminders. It can't connect to Claude.</li>
+        <li>For longer conversations, use voice mode in the Claude app with earbuds.</li>
+      </ul></details>
+      <details><summary>Faces, camera, alerts</summary><ul>
+        <li>Watch faces: NoiseFit → Watch face gallery. You can also set a custom photo face.</li>
+        <li>Camera is a remote shutter for your phone's camera. Open it on the watch while NoiseFit is running.</li>
+        <li>Set a sedentary reminder (every 60 min, 9 am–8 pm) and a water reminder.</li>
+      </ul></details>
+      <details><summary>Sync not working</summary><ol>
+        <li>Keep NoiseFit allowed to run in the background. Turn off battery optimisation for it.</li>
+        <li>Allow Location and Nearby devices permissions. Android needs them for Bluetooth.</li>
+        <li>Turn Bluetooth off and on, then pull down to refresh in NoiseFit.</li>
+        <li>Restart the watch. If it still fails, unpair from NoiseFit, forget it in Bluetooth, and pair again.</li>
+        <li>Update the watch firmware from NoiseFit → Device → Firmware.</li>
+      </ol></details>
+      <details><summary>Targets used here</summary><ul>
+        <li>Sleep: 7–9 hours, with a consistent bedtime.</li>
+        <li>Deep sleep: roughly 60–110 minutes a night.</li>
+        <li>Steps: 8,000+ a day.</li>
+        <li>Workouts: 4 sessions a week, matching your upper/lower dumbbell split.</li>
+      </ul></details>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const TARGET = {sleep:7, steps:8000, workouts:4};
+  let db = null, sample = null, entries = [], isExample = true;
+
+  // Clearly labelled example data, shown only until the first real day is saved.
+  function exampleRows(){
+    const out=[]; const base=new Date();
+    const s=[6.4,7.1,5.9,7.6,6.8,7.3,6.1,8.0,6.6,7.2,6.9,5.8,7.4,7.0];
+    const st=[6200,9100,4800,10200,7400,8600,5300,11800,6900,8800,7600,4500,9400,8100];
+    const rhr=[68,66,70,65,67,66,69,64,67,66,66,71,65,65];
+    const w=["Upper body (dumbbells)","","Lower body (dumbbells)","Walk","","Upper body (dumbbells)","","Football","Lower body (dumbbells)","","Upper body (dumbbells)","","Walk","Lower body (dumbbells)"];
+    for(let i=13;i>=0;i--){
+      const d=new Date(base); d.setDate(base.getDate()-i);
+      const k=13-i;
+      out.push({date:iso(d),sleep:s[k],deep:Math.round(s[k]*11),steps:st[k],rhr:rhr[k],spo2:96+(k%3),stress:30+((k*7)%30),wtype:w[k],wmin:w[k]?40+(k%3)*10:null,whr:w[k]?118+(k%4)*6:null,wcal:w[k]?220+(k%4)*40:null,notes:""});
+    }
+    return out;
+  }
+  function iso(d){const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);return z.toISOString().slice(0,10)}
+  function num(v){return v===null||v===undefined||v===""||isNaN(v)?null:Number(v)}
+  function avg(a){const v=a.filter(x=>x!==null);return v.length?v.reduce((p,c)=>p+c,0)/v.length:null}
+  function fmt(n,d=0){return n===null?"–":Number(n).toLocaleString("en-IN",{maximumFractionDigits:d,minimumFractionDigits:d})}
+  function sd(a){const v=a.filter(x=>x!==null);if(v.length<2)return null;const m=avg(v);return Math.sqrt(v.reduce((p,c)=>p+(c-m)**2,0)/v.length)}
+
+  function lastN(n){
+    const sorted=[...entries].sort((a,b)=>a.date<b.date?-1:1);
+    return sorted.slice(-n);
+  }
+
+  function spark(vals,color,target){
+    const w=200,h=42,p=3; const v=vals.map(num);
+    const pts=v.filter(x=>x!==null); if(pts.length<2) return '<svg class="spark" viewBox="0 0 200 42"></svg>';
+    let mn=Math.min(...pts),mx=Math.max(...pts);
+    if(target!=null){mn=Math.min(mn,target);mx=Math.max(mx,target)}
+    if(mx===mn){mx+=1;mn-=1}
+    const x=i=>p+i*(w-2*p)/(v.length-1), y=val=>h-p-(val-mn)*(h-2*p)/(mx-mn);
+    let d="",first=true,lastI=-1;
+    v.forEach((val,i)=>{if(val===null){first=true;return}d+=(first?"M":"L")+x(i).toFixed(1)+" "+y(val).toFixed(1)+" ";first=false;lastI=i});
+    const tl=target!=null?`<line x1="0" x2="${w}" y1="${y(target).toFixed(1)}" y2="${y(target).toFixed(1)}" stroke="var(--line)" stroke-dasharray="3 3"/>`:"";
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">${tl}<path d="${d}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/><circle cx="${x(lastI)}" cy="${y(v[lastI])}" r="3" fill="${color}"/></svg>`;
+  }
+
+  function renderTiles(){
+    const w=lastN(7);
+    const sl=avg(w.map(e=>num(e.sleep))), stp=avg(w.map(e=>num(e.steps))), rhr=avg(w.map(e=>num(e.rhr)));
+    const wk=w.filter(e=>e.wtype).length;
+    const prev=lastN(14).slice(0,-7); const rhrPrev=avg(prev.map(e=>num(e.rhr)));
+    const slSd=sd(w.map(e=>num(e.sleep)));
+    const pill=(cls,t)=>`<span class="pill ${cls}">${t}</span>`;
+    const tiles=[
+      {name:"Sleep",c:"var(--sleep)",val:fmt(sl,1),unit:"h avg",
+       st: sl===null?pill("none","no data"):sl>=TARGET.sleep?pill("good","on target"):sl>=6?pill("warn","a bit short"):pill("bad","short"),
+       sub: slSd===null?"Target 7–9 h":`Varies ±${fmt(slSd,1)} h night to night`, spark:spark(w.map(e=>e.sleep),"var(--sleep)",TARGET.sleep)},
+      {name:"Steps",c:"var(--steps)",val:fmt(stp),unit:"/ day",
+       st: stp===null?pill("none","no data"):stp>=TARGET.steps?pill("good","on target"):stp>=6000?pill("warn","below 8k"):pill("bad","low"),
+       sub:`Target ${TARGET.steps.toLocaleString("en-IN")}`, spark:spark(w.map(e=>e.steps),"var(--steps)",TARGET.steps)},
+      {name:"Resting HR",c:"var(--hr)",val:fmt(rhr),unit:"bpm",
+       st: rhr===null?pill("none","no data"):rhrPrev===null?pill("none","baseline"):(rhr-rhrPrev)>=3?pill("warn","up "+fmt(rhr-rhrPrev)+" bpm"):(rhrPrev-rhr)>=2?pill("good","down "+fmt(rhrPrev-rhr)+" bpm"):pill("good","steady"),
+       sub: rhrPrev===null?"Compared with the week before once you have 14 days":`Previous week ${fmt(rhrPrev)} bpm`, spark:spark(w.map(e=>e.rhr),"var(--hr)",null)},
+      {name:"Workouts",c:"var(--load)",val:String(wk),unit:"of "+TARGET.workouts,
+       st: wk>=TARGET.workouts?pill("good","plan met"):wk>=2?pill("warn",(TARGET.workouts-wk)+" to go"):pill("bad","behind"),
+       sub:`${fmt(w.reduce((p,e)=>p+(num(e.wmin)||0),0))} active minutes this week`, spark:spark(w.map(e=>e.wtype?num(e.wmin)||0:0),"var(--load)",null)}
+    ];
+    $("tiles").innerHTML=tiles.map(t=>`<div class="tile"><div class="top"><span class="eyebrow"><span class="dot" style="background:${t.c}"></span>${t.name}</span>${t.st}</div><div class="val">${t.val}<small>${t.unit}</small></div>${t.spark}<div class="sub">${t.sub}</div></div>`).join("");
+  }
+
+  function barChart(rows,key,color,label,unit,target,dec){
+    const w=560,h=120,pl=38,pr=6,pt=8,pb=20;
+    const v=rows.map(r=>num(r[key]));
+    const pts=v.filter(x=>x!==null);
+    let mx=Math.max(...pts,target||0,1); const step=niceStep(mx/3); mx=Math.ceil(mx/step)*step;
+    const bw=(w-pl-pr)/rows.length;
+    const y=val=>pt+(h-pt-pb)*(1-val/mx);
+    let g="";
+    for(let t=0;t<=mx+1e-9;t+=step){g+=`<line x1="${pl}" x2="${w-pr}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${y(t)+3.5}" text-anchor="end">${fmtShort(t)}</text>`}
+    let bars="";
+    rows.forEach((r,i)=>{const val=v[i];const x=pl+i*bw+bw*0.18;const bwid=bw*0.64;
+      if(val!==null){const top=y(val);bars+=`<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${bwid.toFixed(1)}" height="${(y(0)-top).toFixed(1)}" rx="3" fill="${color}" opacity="${target!=null&&val<target?0.55:1}"><title>${r.date}: ${fmt(val,dec)} ${unit}</title></rect>`}
+      if(i%2===(rows.length-1)%2){bars+=`<text x="${(pl+i*bw+bw/2).toFixed(1)}" y="${h-5}" text-anchor="middle">${r.date.slice(8)}</text>`}
+    });
+    const tl=target!=null?`<line x1="${pl}" x2="${w-pr}" y1="${y(target)}" y2="${y(target)}" stroke="${color}" stroke-dasharray="4 3" stroke-width="1.2"/>`:"";
+    const lastv=[...v].reverse().find(x=>x!==null);
+    return `<div class="chart"><h3><span><span class="dot" style="background:${color}"></span>${label}</span><span class="muted" style="font:500 12px var(--mono)">latest ${fmt(lastv??null,dec)} ${unit}</span></h3><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${label}, last ${rows.length} days">${g}${tl}${bars}</svg></div>`;
+  }
+  function niceStep(x){if(x<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(x)));const n=x/p;return (n<=1?1:n<=2?2:n<=5?5:10)*p}
+  function fmtShort(n){return n>=1000?(n/1000).toFixed(n%1000?1:0)+"k":String(Math.round(n*10)/10)}
+
+  function renderCharts(){
+    const rows=lastN(14);
+    if(!rows.length){$("charts").innerHTML='<p class="muted">No days logged yet.</p>';return}
+    $("rangeLbl").textContent=rows[0].date+" → "+rows[rows.length-1].date;
+    $("charts").innerHTML=
+      barChart(rows,"sleep","var(--sleep)","Sleep","h",TARGET.sleep,1)+
+      barChart(rows,"steps","var(--steps)","Steps","",TARGET.steps,0)+
+      barChart(rows,"rhr","var(--hr)","Resting heart rate","bpm",null,0);
+  }
+
+  function renderTable(){
+    const sorted=[...entries].sort((a,b)=>a.date<b.date?1:-1);
+    $("countLbl").textContent=isExample?"example rows":sorted.length+" days logged";
+    $("rows").innerHTML=sorted.map(e=>`<tr><td>${e.date}</td><td>${fmt(num(e.sleep),1)}</td><td>${fmt(num(e.deep))}</td><td>${fmt(num(e.steps))}</td><td>${fmt(num(e.rhr))}</td><td>${fmt(num(e.spo2))}</td><td style="font-family:var(--body)">${e.wtype?esc(e.wtype)+(e.wmin?" · "+e.wmin+" min":""):'<span class="muted">rest</span>'}</td><td>${fmt(num(e.stress))}</td><td>${isExample?"":`<button type="button" data-edit="${e.date}">Edit</button>`}</td></tr>`).join("");
+  }
+  function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+  function renderAll(){
+    const st=$("status");
+    if(isExample){st.textContent="Showing example data";st.className="status example"}
+    else{st.textContent=entries.length+" days · saved";st.className="status"}
+    renderTiles();renderCharts();renderTable();
+  }
+
+  $("rows").addEventListener("click",ev=>{
+    const d=ev.target.closest("[data-edit]");if(!d)return;
+    const e=entries.find(x=>x.date===d.dataset.edit);if(!e)return;
+    $("date").value=e.date;["sleep","deep","steps","rhr","spo2","stress","wmin","whr","wcal"].forEach(k=>$(k).value=e[k]??"");
+    $("wtype").value=e.wtype||"";$("notes").value=e.notes||"";
+    $("formMsg").textContent="Editing "+e.date+". Save to update.";
+    $("date").scrollIntoView({behavior:"smooth",block:"center"});$("date").focus({preventScroll:true});
+  });
+
+  $("f").addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    const date=$("date").value;
+    if(!date){$("formMsg").textContent="Pick a date first.";return}
+    const rec={date};
+    ["sleep","deep","steps","rhr","spo2","stress","wmin","whr","wcal"].forEach(k=>rec[k]=num($(k).value));
+    rec.wtype=$("wtype").value;rec.notes=$("notes").value.trim().slice(0,500);rec.updatedAt=new Date().toISOString();
+    if(!db){$("formMsg").textContent="Saving isn't available in this view. Open the page from your Claude gallery.";return}
+    $("saveBtn").disabled=true;$("formMsg").textContent="Saving…";
+    try{
+      await db.doc("days/"+date).set(rec);
+      $("formMsg").textContent="Saved "+date+".";
+      const next=new Date(date+"T12:00:00");next.setDate(next.getDate()+1);
+      $("f").reset();$("date").value=iso(next)>iso(new Date())?iso(new Date()):iso(next);
+    }catch(e){
+      $("formMsg").textContent=e&&e.code==="invalid_argument"?"You don't have permission to save to this log.":"Couldn't save. Check your connection and try again.";
+    }finally{$("saveBtn").disabled=false}
+  });
+
+  $("readBtn").addEventListener("click",async()=>{
+    const out=$("readOut");
+    if(!sample){out.textContent="Asking Claude isn't available in this view. Ask in the chat instead: \"Review my Wrist Log\".";return}
+    if(isExample){out.textContent="Log a few real days first. The review needs your own numbers, not the example rows.";return}
+    const rows=lastN(14);
+    $("readBtn").disabled=true;out.textContent="Thinking…";
+    const prompt=`You are reviewing a person's smartwatch log (Noise watch, exported by hand). They are an adult office professional in Mumbai who recently started a 4-day upper/lower home dumbbell split. Targets: sleep 7-9 h, steps 8000+/day, 4 workouts/week.
+
+Data (JSON, one row per day; nulls mean not logged):
+${JSON.stringify(rows.map(({updatedAt,...r})=>r))}
+
+Write a concise weekly review in plain text (no markdown headers, no tables), under 220 words:
+1. One-line overall verdict.
+2. Sleep: average, consistency, deep sleep. Point out the worst nights and any pattern from notes.
+3. Activity & training: steps trend, workouts done vs plan, recovery (resting HR trend).
+4. Two specific, practical changes for next week.
+Only use numbers present in the data. This is wellness guidance, not medical advice; if SpO2 is repeatedly under 94 or resting HR rises 5+ bpm for several days, suggest checking with a doctor.`;
+    try{
+      const r=await sample(prompt,{onText:({text})=>{out.textContent=text}});
+      out.textContent=r.text;
+    }catch(e){
+      out.textContent=e&&e.code==="not_granted"?"Claude access wasn't allowed for this page. You can ask for a review in the chat instead."
+        :e&&e.code==="rate_limited"?"Too many requests just now. Try again in a minute.":(e&&e.text)||"Couldn't get a review right now. Try again shortly.";
+    }finally{$("readBtn").disabled=false}
+  });
+
+  // Boot: show example data first, then live data.
+  $("date").value=iso(new Date());
+  entries=exampleRows();renderAll();
+
+  (async()=>{
+    try{sample=await window.claude?.use?.("sample")}catch(_){sample=null}
+  })();
+  (async()=>{
+    try{db=await window.claude?.use?.("db")}catch(_){db=null}
+    if(!db){$("status").textContent="Example data · saving unavailable here";$("status").className="status example";return}
+    db.collection("days").onSnapshot(snap=>{
+      const real=snap.docs.map(d=>d.data()).filter(Boolean);
+      if(real.length){entries=real.map(r=>({...r}));isExample=false}
+      else{entries=exampleRows();isExample=true}
+      renderAll();
+    },err=>{$("status").textContent="Live updates paused. Reload to reconnect.";});
+  })();
+})();
+</script>
+
+</body></html>

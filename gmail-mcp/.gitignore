@@ -1,0 +1,6 @@
+# Secrets: never commit these
+client_secret*.json
+tokens/
+accounts.json
+.venv/
+__pycache__/
