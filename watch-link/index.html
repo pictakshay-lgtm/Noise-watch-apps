@@ -85,16 +85,18 @@ li{margin:3px 0}
   <section class="panel" aria-labelledby="connH">
     <div class="head"><h2 id="connH">Connect</h2><span class="eyebrow" id="connState">Not connected</span></div>
     <ol class="muted">
-      <li>Close NoiseFit (Settings → Apps → NoiseFit → Force stop). The watch usually accepts only one connection at a time.</li>
+      <li>Free the watch: in phone Settings → Bluetooth, tap ⚙️ next to the watch → <b>Disconnect</b> (not Forget), then force-stop NoiseFit. A watch that's connected to the phone stays hidden from Chrome.</li>
       <li>Turn on Bluetooth and Location on your phone.</li>
       <li>Tap <b>Connect to watch</b> and pick your watch from the list.</li>
     </ol>
     <label>Extra service UUIDs (optional, comma separated)
       <input id="extra" placeholder="e.g. fee7, 0000d0ff-3c17-d293-8e48-14fe2e4da212" autocomplete="off" spellcheck="false">
     </label>
+    <p class="muted" style="font-size:13px"><b>Connect to watch</b> lists only Noise and MOYOUNG-based watches. If the list is empty, the watch is still connected to the phone or NoiseFit. <b>Show all devices</b> lists everything nearby.</p>
     <p class="muted" style="font-size:13px">Chrome only opens the services it's told about in advance. If the watch has services that don't show up below, find their UUIDs with the free <i>nRF Connect</i> app and add them here.</p>
     <div class="btns">
       <button class="primary" id="connectBtn" type="button">Connect to watch</button>
+      <button id="allBtn" type="button">Show all devices</button>
       <button id="disconnectBtn" type="button" disabled>Disconnect</button>
     </div>
   </section>
@@ -146,7 +148,8 @@ import { CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, to
 
 const $ = id => document.getElementById(id);
 const HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
-const INFO = { "00002a29-0000-1000-8000-00805f9b34fb": "Maker", "00002a24-0000-1000-8000-00805f9b34fb": "Model",
+const MOYOUNG = "0000feea-0000-1000-8000-00805f9b34fb";
+const INFO = { "00002a00-0000-1000-8000-00805f9b34fb": "Device name", "00002a29-0000-1000-8000-00805f9b34fb": "Maker", "00002a24-0000-1000-8000-00805f9b34fb": "Model",
   "00002a26-0000-1000-8000-00805f9b34fb": "Firmware", "00002a19-0000-1000-8000-00805f9b34fb": "Battery" };
 
 let device = null, hrSamples = [], logRows = [], deviceInfo = {};
@@ -223,6 +226,10 @@ async function listen(ch, out, btn) {
 async function explore(server) {
   let services = [];
   try { services = await server.getPrimaryServices(); } catch (e) { log("error", "", null, "No services opened: " + e.message); }
+  if (!services.some(s => s.uuid === MOYOUNG)) {
+    deviceInfo.Note = "No Noise/MOYOUNG service (feea) found. This may not be your watch; disconnect and try again.";
+  }
+  renderDevice();
   $("svcCount").textContent = `${services.length} service${services.length === 1 ? "" : "s"}`;
   const box = $("services"); box.innerHTML = ""; box.classList.remove("muted");
   if (!services.length) { box.innerHTML = '<p class="muted">The watch didn\'t open any of the services Chrome asked for. Use nRF Connect to find its service UUIDs and add them above.</p>'; return; }
@@ -250,20 +257,22 @@ async function explore(server) {
 }
 
 // ---------- connect ----------
-async function connect() {
+async function connect(showAll) {
   const extra = $("extra").value.split(",").map(s => s.trim()).filter(Boolean);
   const bad = extra.filter(s => !normalizeUuid(s));
   if (bad.length) { alert(`These aren't valid UUIDs: ${bad.join(", ")}`); return; }
   store("watchlink.extra", $("extra").value);
   const optionalServices = [...new Set([...CANDIDATE_SERVICES, ...extra.map(normalizeUuid)])];
   try {
-    device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices });
+    device = await navigator.bluetooth.requestDevice(showAll
+      ? { acceptAllDevices: true, optionalServices }
+      : { filters: [{ services: [MOYOUNG] }, { namePrefix: "Noise" }], optionalServices });
   } catch (e) { if (e.name !== "NotFoundError") log("error", "", null, e.message); return; }
   device.addEventListener("gattserverdisconnected", () => {
-    $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; $("connectBtn").disabled = false;
+    $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; $("connectBtn").disabled = false; $("allBtn").disabled = false;
     log("info", "", null, "disconnected");
   });
-  $("connState").textContent = "Connecting…"; $("connectBtn").disabled = true;
+  $("connState").textContent = "Connecting…"; $("connectBtn").disabled = true; $("allBtn").disabled = true;
   deviceInfo = {}; hrSamples = []; renderDevice();
   try {
     const server = await device.gatt.connect();
@@ -271,12 +280,13 @@ async function connect() {
     log("info", "", null, `connected to ${device.name || device.id}`);
     await explore(server);
   } catch (e) {
-    $("connState").textContent = "Couldn't connect"; $("connectBtn").disabled = false;
+    $("connState").textContent = "Couldn't connect"; $("connectBtn").disabled = false; $("allBtn").disabled = false;
     log("error", "", null, e.message + " (Is NoiseFit still connected to the watch?)");
   }
 }
 
-$("connectBtn").onclick = connect;
+$("connectBtn").onclick = () => connect(false);
+$("allBtn").onclick = () => connect(true);
 $("disconnectBtn").onclick = () => device?.gatt?.connected && device.gatt.disconnect();
 $("copyBtn").onclick = async () => {
   try { await navigator.clipboard.writeText($("handoff").textContent); $("copyBtn").textContent = "Copied"; setTimeout(() => $("copyBtn").textContent = "Copy", 1500); }
@@ -293,8 +303,8 @@ $("extra").value = recall("watchlink.extra");
 // ---------- support check ----------
 (async () => {
   const s = $("support");
-  if (!window.isSecureContext) { s.textContent = "Bluetooth needs a secure (https) page. Open this from GitHub Pages, not as a local file."; s.hidden = false; $("connectBtn").disabled = true; return; }
-  if (!navigator.bluetooth) { s.textContent = "This browser can't use Bluetooth. Open this page in Chrome on Android (iPhone browsers don't support it)."; s.hidden = false; $("connectBtn").disabled = true; return; }
+  if (!window.isSecureContext) { s.textContent = "Bluetooth needs a secure (https) page. Open this from GitHub Pages, not as a local file."; s.hidden = false; $("connectBtn").disabled = true; $("allBtn").disabled = true; return; }
+  if (!navigator.bluetooth) { s.textContent = "This browser can't use Bluetooth. Open this page in Chrome on Android (iPhone browsers don't support it)."; s.hidden = false; $("connectBtn").disabled = true; $("allBtn").disabled = true; return; }
   try { if (!(await navigator.bluetooth.getAvailability())) { s.textContent = "Bluetooth looks off or unavailable. Turn it on and reload."; s.hidden = false; } } catch (_) {}
 })();
 </script>
