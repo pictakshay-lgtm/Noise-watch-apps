@@ -143,6 +143,11 @@ li{margin:3px 0}
   </section>
 </div>
 
+<script>
+window.addEventListener("error", e => { if (!(e instanceof ErrorEvent) && !(e.target && e.target.tagName === "SCRIPT")) return; const s = document.getElementById("support"); s.textContent = "Page error: " + (e.message || "script failed to load") + ". Send a screenshot of this to Claude."; s.hidden = false; }, true);
+window.addEventListener("unhandledrejection", e => { const s = document.getElementById("support"); s.textContent = "Page error: " + ((e.reason && e.reason.message) || e.reason) + ". Send a screenshot of this to Claude."; s.hidden = false; });
+setTimeout(() => { if (!window.watchLinkReady) { const s = document.getElementById("support"); s.textContent = "The page's main script didn't load, so the buttons won't work. Reload the page; if this stays, send a screenshot to Claude."; s.hidden = false; } }, 4000);
+</script>
 <script type="module">
 import { CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js";
 
@@ -258,6 +263,7 @@ async function explore(server) {
 
 // ---------- connect ----------
 async function connect(showAll) {
+  if (!navigator.bluetooth) { showProblem(noBluetoothMessage()); return; }
   const extra = $("extra").value.split(",").map(s => s.trim()).filter(Boolean);
   const bad = extra.filter(s => !normalizeUuid(s));
   if (bad.length) { alert(`These aren't valid UUIDs: ${bad.join(", ")}`); return; }
@@ -267,7 +273,11 @@ async function connect(showAll) {
     device = await navigator.bluetooth.requestDevice(showAll
       ? { acceptAllDevices: true, optionalServices }
       : { filters: [{ services: [MOYOUNG] }, { namePrefix: "Noise" }], optionalServices });
-  } catch (e) { if (e.name !== "NotFoundError") log("error", "", null, e.message); return; }
+  } catch (e) {
+    // NotFoundError also means the user closed the chooser, so only report other errors.
+    if (e.name !== "NotFoundError") { log("error", "", null, e.message); showProblem(`Couldn't open the device list: ${e.message}`); }
+    return;
+  }
   device.addEventListener("gattserverdisconnected", () => {
     $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; $("connectBtn").disabled = false; $("allBtn").disabled = false;
     log("info", "", null, "disconnected");
@@ -301,17 +311,21 @@ $("exportBtn").onclick = () => {
 $("extra").value = recall("watchlink.extra");
 
 // ---------- support check ----------
+function showProblem(html) { const s = $("support"); s.innerHTML = html; s.hidden = false; }
+function noBluetoothMessage() {
+  // iPadOS reports itself as a Mac, so also check for a touch screen.
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  if (location.protocol !== "https:") return "Bluetooth needs a secure (https) page. Open this from GitHub Pages, not as a local file.";
+  return ios
+    ? "Safari and Chrome on iPad and iPhone can't use Bluetooth, because Apple doesn't allow it in web pages. Install the free <b>Bluefy – Web BLE Browser</b> app from the App Store, then open this page in Bluefy. Or use Chrome on an Android phone."
+    : "This browser can't use Bluetooth. Open this page in Chrome on Android or on a computer, or in Bluefy on iPad and iPhone.";
+}
+window.watchLinkReady = true;
 (async () => {
-  const s = $("support");
-  if (!window.isSecureContext) { s.textContent = "Bluetooth needs a secure (https) page. Open this from GitHub Pages, not as a local file."; s.hidden = false; $("connectBtn").disabled = true; $("allBtn").disabled = true; return; }
-  if (!navigator.bluetooth) {
-    // iPadOS reports itself as a Mac, so also check for a touch screen.
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-    s.innerHTML = ios
-      ? "Safari and Chrome on iPad and iPhone can't use Bluetooth, because Apple doesn't allow it in web pages. Install the free <b>Bluefy – Web BLE Browser</b> app from the App Store, then open this page in Bluefy. Or use Chrome on an Android phone."
-      : "This browser can't use Bluetooth. Open this page in Chrome on Android or on a computer, or in Bluefy on iPad and iPhone.";
-    s.hidden = false; $("connectBtn").disabled = true; $("allBtn").disabled = true; return; }
-  try { if (!(await navigator.bluetooth.getAvailability())) { s.textContent = "Bluetooth looks off or unavailable. Turn it on and reload."; s.hidden = false; } } catch (_) {}
+  // Some browsers (such as Bluefy) add Bluetooth support a moment after the page loads, so wait briefly.
+  for (let i = 0; i < 15 && !navigator.bluetooth; i++) await new Promise(r => setTimeout(r, 200));
+  if (!navigator.bluetooth) { showProblem(noBluetoothMessage()); return; }
+  try { if (navigator.bluetooth.getAvailability && !(await navigator.bluetooth.getAvailability())) showProblem("Bluetooth looks off or unavailable. Turn it on and reload."); } catch (_) {}
 })();
 </script>
 </body>
