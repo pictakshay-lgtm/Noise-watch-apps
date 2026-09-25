@@ -1,6 +1,6 @@
 # Watch Link
 
-A web page that connects to a Noise smartwatch over Bluetooth from **Chrome on Android**. There's nothing to install.
+A web page that connects to a Noise smartwatch over Bluetooth from **Chrome on Android**, or from the **Bluefy** browser app on iPad and iPhone. On Android there's nothing to install.
 
 - **Watch:** name, battery and model or firmware, if the watch shares them.
 - **Heart rate:** live readings with low, average and high, plus a resting estimate (the lowest 1-minute average in the session).
@@ -28,6 +28,17 @@ Chrome only opens services it's told about in advance. The page asks for the sta
 3. Open the page in Chrome on Android and tap **Connect to watch**.
 
 The page must be served over **https**. Opening the file directly doesn't work. The easiest option is GitHub Pages: go to repository **Settings → Pages → Deploy from a branch → `main` / `(root)`**. The page is then at `https://<user>.github.io/Noise-watch-apps/watch-link/`.
+
+## iPad and iPhone
+
+Safari, and every other iPad or iPhone browser, can't use Web Bluetooth, because Apple requires them all to use its WebKit engine, which doesn't support it. You have two options:
+
+| Option | Effort | Notes |
+|---|---|---|
+| **Bluefy – Web BLE Browser** (free, App Store) | None. Open this page in Bluefy. | Bluefy is a separate browser app that adds Web Bluetooth, so this page runs there unchanged. Not yet tested with the Noise Icon 2. |
+| A native iPad app (Swift, CoreBluetooth) | High | Needs a Mac with Xcode. Installing on your own iPad works with a free Apple ID, but the app has to be re-signed every 7 days. A paid developer account ($99 a year) removes that limit. |
+
+Either way, the watch accepts only one Bluetooth connection at a time. Disconnect it from your phone (and close NoiseFit) before connecting from the iPad, and the other way round.
 
 ## Decoding steps and sleep
 
