@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Watch Link</title>
+<meta name="description" content="Connect to a Noise smartwatch over Bluetooth from Chrome on Android, read what it shares, and prepare numbers for Wrist Log.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --sunk:#E8ECF2; --ink:#131A26; --muted:#5B6678; --line:#D6DCE6;
+  --accent:#3350E0; --accent-ink:#FFFFFF; --hr:#D23A4E; --good:#12915F; --warn:#B8740A; --bad:#C8363F;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0D121B; --surface:#161D2A; --sunk:#1E2736; --ink:#E7ECF4; --muted:#95A1B5; --line:#2A3548;
+    --accent:#7F95FF; --accent-ink:#0D121B; --hr:#FF7A8A; --good:#43C98E; --warn:#F0AE45; --bad:#FF7A8A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0D121B; --surface:#161D2A; --sunk:#1E2736; --ink:#E7ECF4; --muted:#95A1B5; --line:#2A3548;
+  --accent:#7F95FF; --accent-ink:#0D121B; --hr:#FF7A8A; --good:#43C98E; --warn:#F0AE45; --bad:#FF7A8A;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--body);padding:28px 16px 64px}
+.wrap{max-width:960px;margin:0 auto;display:grid;gap:20px}
+h1,h2{font-family:var(--display);margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:clamp(28px,5vw,38px)}
+h2{font-size:19px}
+p{margin:0}
+.eyebrow{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;display:grid;gap:14px;min-width:0}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.banner{border-radius:12px;padding:12px 14px;font-size:14px;background:color-mix(in srgb,var(--warn) 14%,transparent);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent)}
+.banner[hidden]{display:none}
+.btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:600 14px var(--body);border-radius:10px;padding:10px 16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.small{padding:5px 10px;font-size:12.5px}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input{font:400 14px var(--mono);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%}
+label{display:grid;gap:5px;font:500 12.5px var(--body);color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+@media (max-width:720px){.grid{grid-template-columns:1fr}}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:440px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stat b{display:block;font:600 22px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.big{font:700 56px/1 var(--display);color:var(--hr);font-variant-numeric:tabular-nums}
+.big small{font:500 16px var(--mono);color:var(--muted);margin-left:6px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14px}
+dt{color:var(--muted)}
+dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
+details{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}
+.char{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.char:first-of-type{border-top:0}
+.char code{font:12.5px var(--mono);overflow-wrap:anywhere}
+.props{font:11px var(--mono);color:var(--muted)}
+.val{font:12.5px var(--mono);overflow-wrap:anywhere}
+.log{font:12px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.handoff{font:14px var(--mono);background:var(--bg);border:1px dashed var(--line);border-radius:12px;padding:12px 14px;overflow-wrap:anywhere}
+ol{margin:0;padding-left:20px}
+li{margin:3px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Noise watch · Bluetooth</div>
+    <h1>Watch Link</h1>
+    <p class="muted">Connect to your watch from Chrome on Android, see what it shares over Bluetooth, and get numbers ready for Wrist Log.</p>
+  </header>
+
+  <div class="banner" id="support" hidden></div>
+
+  <section class="panel" aria-labelledby="connH">
+    <div class="head"><h2 id="connH">Connect</h2><span class="eyebrow" id="connState">Not connected</span></div>
+    <ol class="muted">
+      <li>Close NoiseFit (Settings → Apps → NoiseFit → Force stop). The watch usually accepts only one connection at a time.</li>
+      <li>Turn on Bluetooth and Location on your phone.</li>
+      <li>Tap <b>Connect to watch</b> and pick your watch from the list.</li>
+    </ol>
+    <label>Extra service UUIDs (optional, comma separated)
+      <input id="extra" placeholder="e.g. fee7, 0000d0ff-3c17-d293-8e48-14fe2e4da212" autocomplete="off" spellcheck="false">
+    </label>
+    <p class="muted" style="font-size:13px">Chrome only opens the services it's told about in advance. If the watch has services that don't show up below, find their UUIDs with the free <i>nRF Connect</i> app and add them here.</p>
+    <div class="btns">
+      <button class="primary" id="connectBtn" type="button">Connect to watch</button>
+      <button id="disconnectBtn" type="button" disabled>Disconnect</button>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="devH">
+      <h2 id="devH">Watch</h2>
+      <dl id="device"><dt>Status</dt><dd>Not connected</dd></dl>
+    </section>
+
+    <section class="panel" aria-labelledby="hrH">
+      <div class="head"><h2 id="hrH">Heart rate</h2><span class="eyebrow" id="hrState">Waiting</span></div>
+      <div class="big" id="bpm">–<small>bpm</small></div>
+      <div class="stats">
+        <div class="stat"><span class="eyebrow">Low</span><b id="hrMin">–</b></div>
+        <div class="stat"><span class="eyebrow">Avg</span><b id="hrAvg">–</b></div>
+        <div class="stat"><span class="eyebrow">High</span><b id="hrMax">–</b></div>
+        <div class="stat"><span class="eyebrow">Resting est.</span><b id="hrRest">–</b></div>
+      </div>
+      <p class="muted" style="font-size:13px">For a resting estimate, sit still for a few minutes. It's the lowest 1-minute average heart rate in this session. If the watch doesn't share live heart rate, start a workout on the watch; some models only share it then.</p>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="wlH">
+    <div class="head"><h2 id="wlH">For Wrist Log</h2><span class="eyebrow">copy and paste</span></div>
+    <div class="handoff" id="handoff">Connect and read heart rate for at least a minute first.</div>
+    <div class="btns">
+      <button id="copyBtn" type="button" disabled>Copy</button>
+      <a href="https://claude.ai/artifact/M9s2WGPGC8fTm4bbmyNqEK" target="_blank" rel="noopener">Open Wrist Log</a>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="svcH">
+    <div class="head"><h2 id="svcH">What the watch shares</h2><span class="eyebrow" id="svcCount"></span></div>
+    <div id="services" class="muted">Connect to list the watch's Bluetooth services.</div>
+  </section>
+
+  <section class="panel" aria-labelledby="logH">
+    <div class="head"><h2 id="logH">Raw log</h2>
+      <div class="btns"><button class="small" id="exportBtn" type="button">Export JSON</button><button class="small" id="clearBtn" type="button">Clear</button></div>
+    </div>
+    <p class="muted" style="font-size:13px">Every value read or received, in hex. Export it and share it with Claude to help decode the watch's private data (steps, sleep).</p>
+    <pre class="log" id="log" aria-live="polite"></pre>
+  </section>
+</div>
+
+<script type="module">
+import { CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js";
+
+const $ = id => document.getElementById(id);
+const HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
+const INFO = { "00002a29-0000-1000-8000-00805f9b34fb": "Maker", "00002a24-0000-1000-8000-00805f9b34fb": "Model",
+  "00002a26-0000-1000-8000-00805f9b34fb": "Firmware", "00002a19-0000-1000-8000-00805f9b34fb": "Battery" };
+
+let device = null, hrSamples = [], logRows = [], deviceInfo = {};
+
+// ---------- helpers ----------
+function store(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+function recall(k) { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function today() { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+function bytesOf(dv) { return new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength); }
+
+function log(kind, uuid, bytes, note) {
+  const row = { t: new Date().toISOString(), kind, uuid, hex: bytes ? toHex(bytes) : "", note: note || "" };
+  logRows.push(row);
+  const line = `${row.t.slice(11, 19)} ${kind.padEnd(6)} ${shortId(uuid || "")} ${row.hex}${row.note ? "  " + row.note : ""}\n`;
+  const el = $("log"); el.textContent += line; el.scrollTop = el.scrollHeight;
+}
+
+function renderDevice() {
+  const rows = [["Name", device?.name || "Unknown"], ...Object.entries(deviceInfo)];
+  $("device").innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+}
+
+function renderHr() {
+  if (!hrSamples.length) return;
+  const v = hrSamples.map(s => s.bpm);
+  $("bpm").innerHTML = `${v[v.length - 1]}<small>bpm</small>`;
+  $("hrMin").textContent = Math.min(...v);
+  $("hrMax").textContent = Math.max(...v);
+  $("hrAvg").textContent = Math.round(v.reduce((a, b) => a + b, 0) / v.length);
+  const rest = restingEstimate(hrSamples);
+  $("hrRest").textContent = rest ?? "–";
+  const mins = Math.round((hrSamples[hrSamples.length - 1].t - hrSamples[0].t) / 60000);
+  $("hrState").textContent = `${v.length} readings · ${mins} min`;
+  if (rest != null) {
+    $("handoff").textContent = `${today()} · Resting HR ${rest} bpm (Watch Link, ${mins}-min session)` +
+      (deviceInfo.Battery ? ` · watch battery ${deviceInfo.Battery}` : "");
+    $("copyBtn").disabled = false;
+  }
+}
+
+function onHr(ev) {
+  const bytes = bytesOf(ev.target.value);
+  const hr = parseHeartRate(bytes);
+  log("notify", HR_CHAR, bytes, hr ? `${hr.bpm} bpm` : "");
+  if (hr && hr.bpm > 25 && hr.bpm < 230 && hr.contact !== false) { hrSamples.push({ t: Date.now(), bpm: hr.bpm }); renderHr(); }
+}
+
+// ---------- explorer ----------
+async function readChar(ch, out) {
+  try {
+    const bytes = bytesOf(await ch.readValue());
+    const desc = describeValue(ch.uuid, bytes);
+    out.textContent = desc != null ? `${desc}  (${toHex(bytes)})` : toHex(bytes) || "(empty)";
+    log("read", ch.uuid, bytes, desc || "");
+    if (INFO[ch.uuid] && desc) { deviceInfo[INFO[ch.uuid]] = desc; renderDevice(); }
+  } catch (e) { out.textContent = `Couldn't read: ${e.message}`; log("error", ch.uuid, null, e.message); }
+}
+
+async function listen(ch, out, btn) {
+  try {
+    if (ch.uuid === HR_CHAR) ch.addEventListener("characteristicvaluechanged", onHr);
+    else ch.addEventListener("characteristicvaluechanged", ev => {
+      const bytes = bytesOf(ev.target.value); const desc = describeValue(ch.uuid, bytes);
+      out.textContent = desc != null ? `${desc}  (${toHex(bytes)})` : toHex(bytes);
+      log("notify", ch.uuid, bytes, desc || "");
+    });
+    await ch.startNotifications();
+    btn.disabled = true; btn.textContent = "Listening";
+    log("info", ch.uuid, null, "listening");
+  } catch (e) { out.textContent = `Couldn't listen: ${e.message}`; log("error", ch.uuid, null, e.message); }
+}
+
+async function explore(server) {
+  let services = [];
+  try { services = await server.getPrimaryServices(); } catch (e) { log("error", "", null, "No services opened: " + e.message); }
+  $("svcCount").textContent = `${services.length} service${services.length === 1 ? "" : "s"}`;
+  const box = $("services"); box.innerHTML = ""; box.classList.remove("muted");
+  if (!services.length) { box.innerHTML = '<p class="muted">The watch didn\'t open any of the services Chrome asked for. Use nRF Connect to find its service UUIDs and add them above.</p>'; return; }
+
+  for (const svc of services) {
+    const det = document.createElement("details"); det.open = true;
+    det.innerHTML = `<summary>${esc(STD_SERVICES[svc.uuid] || "Vendor service")} <span class="props">${esc(shortId(svc.uuid))}</span></summary>`;
+    box.appendChild(det);
+    let chars = [];
+    try { chars = await svc.getCharacteristics(); } catch (e) { det.insertAdjacentHTML("beforeend", `<p class="muted">Couldn't list: ${esc(e.message)}</p>`); continue; }
+    for (const ch of chars) {
+      const p = ch.properties;
+      const props = ["read", "write", "writeWithoutResponse", "notify", "indicate"].filter(k => p[k]).join(" · ");
+      const row = document.createElement("div"); row.className = "char";
+      row.innerHTML = `<div><b>${esc(STD_CHARS[ch.uuid] || "Unknown")}</b> <code>${esc(shortId(ch.uuid))}</code></div><div class="props">${esc(props)}</div><div class="val muted">–</div><div class="btns"></div>`;
+      const out = row.querySelector(".val"), btns = row.querySelector(".btns");
+      if (p.read) { const b = document.createElement("button"); b.className = "small"; b.type = "button"; b.textContent = "Read"; b.onclick = () => readChar(ch, out); btns.appendChild(b); await readChar(ch, out); }
+      if (p.notify || p.indicate) {
+        const b = document.createElement("button"); b.className = "small"; b.type = "button"; b.textContent = "Listen"; b.onclick = () => listen(ch, out, b); btns.appendChild(b);
+        if (ch.uuid === HR_CHAR) await listen(ch, out, b);
+      }
+      det.appendChild(row);
+    }
+  }
+}
+
+// ---------- connect ----------
+async function connect() {
+  const extra = $("extra").value.split(",").map(s => s.trim()).filter(Boolean);
+  const bad = extra.filter(s => !normalizeUuid(s));
+  if (bad.length) { alert(`These aren't valid UUIDs: ${bad.join(", ")}`); return; }
+  store("watchlink.extra", $("extra").value);
+  const optionalServices = [...new Set([...CANDIDATE_SERVICES, ...extra.map(normalizeUuid)])];
+  try {
+    device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices });
+  } catch (e) { if (e.name !== "NotFoundError") log("error", "", null, e.message); return; }
+  device.addEventListener("gattserverdisconnected", () => {
+    $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; $("connectBtn").disabled = false;
+    log("info", "", null, "disconnected");
+  });
+  $("connState").textContent = "Connecting…"; $("connectBtn").disabled = true;
+  deviceInfo = {}; hrSamples = []; renderDevice();
+  try {
+    const server = await device.gatt.connect();
+    $("connState").textContent = "Connected"; $("disconnectBtn").disabled = false;
+    log("info", "", null, `connected to ${device.name || device.id}`);
+    await explore(server);
+  } catch (e) {
+    $("connState").textContent = "Couldn't connect"; $("connectBtn").disabled = false;
+    log("error", "", null, e.message + " (Is NoiseFit still connected to the watch?)");
+  }
+}
+
+$("connectBtn").onclick = connect;
+$("disconnectBtn").onclick = () => device?.gatt?.connected && device.gatt.disconnect();
+$("copyBtn").onclick = async () => {
+  try { await navigator.clipboard.writeText($("handoff").textContent); $("copyBtn").textContent = "Copied"; setTimeout(() => $("copyBtn").textContent = "Copy", 1500); }
+  catch (_) { $("copyBtn").textContent = "Select and copy manually"; }
+};
+$("clearBtn").onclick = () => { logRows = []; $("log").textContent = ""; };
+$("exportBtn").onclick = () => {
+  const blob = new Blob([JSON.stringify({ device: device?.name || null, info: deviceInfo, hr: hrSamples, log: logRows }, null, 2)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `watch-link-${today()}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("extra").value = recall("watchlink.extra");
+
+// ---------- support check ----------
+(async () => {
+  const s = $("support");
+  if (!window.isSecureContext) { s.textContent = "Bluetooth needs a secure (https) page. Open this from GitHub Pages, not as a local file."; s.hidden = false; $("connectBtn").disabled = true; return; }
+  if (!navigator.bluetooth) { s.textContent = "This browser can't use Bluetooth. Open this page in Chrome on Android (iPhone browsers don't support it)."; s.hidden = false; $("connectBtn").disabled = true; return; }
+  try { if (!(await navigator.bluetooth.getAvailability())) { s.textContent = "Bluetooth looks off or unavailable. Turn it on and reload."; s.hidden = false; } } catch (_) {}
+})();
+</script>
+</body>
+</html>
