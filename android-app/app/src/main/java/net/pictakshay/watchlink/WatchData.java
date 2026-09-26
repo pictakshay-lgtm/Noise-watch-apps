@@ -44,6 +44,12 @@ final class WatchData {
         try { return new JSONObject(root.toString()); } catch (JSONException e) { return new JSONObject(); }
     }
 
+    /** Replaces everything with a restored backup. */
+    synchronized void replace(JSONObject restored) {
+        root = restored;
+        save();
+    }
+
     synchronized void recordSteps(long t, int steps, int distance, int calories) {
         try {
             JSONObject latest = obj(root, "latest");

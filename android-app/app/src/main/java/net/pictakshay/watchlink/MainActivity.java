@@ -42,6 +42,8 @@ public class MainActivity extends Activity {
     static final String START_PAGE = ORIGIN + "/assets/watch-link/app/index.html";
     private static final int PERMISSION_REQUEST = 1;
     private static final int LOCATION_REQUEST = 2;
+    private static final int HEALTH_REQUEST = 3;
+    private Granted healthCallback;
 
     interface Granted { void done(boolean granted); }
     private Granted locationCallback;
@@ -140,7 +142,8 @@ public class MainActivity extends Activity {
 
         requestBluetoothPermissions();
         bindService(new Intent(this, BleService.class), connection, Context.BIND_AUTO_CREATE);
-        web.loadUrl(START_PAGE);
+        boolean privacy = getIntent() != null && "android.intent.action.VIEW_PERMISSION_USAGE".equals(getIntent().getAction());
+        web.loadUrl(privacy ? ORIGIN + "/assets/watch-link/app/privacy.html" : START_PAGE);
     }
 
     @Override protected void onResume() {
@@ -156,6 +159,19 @@ public class MainActivity extends Activity {
         }
         locationCallback = callback;
         requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_REQUEST);
+    }
+
+    /** Asks for Health Connect write access (Android 14+ shows its own permission screen). */
+    void requestHealth(Granted callback) {
+        if (!HealthSync.supported()) { callback.done(false); return; }
+        if (HealthSync.granted(this)) { callback.done(true); return; }
+        healthCallback = callback;
+        requestPermissions(HealthSync.PERMISSIONS, HEALTH_REQUEST);
+    }
+
+    @Override protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        GoogleAccounts.onActivityResult(this, request, result, data);
     }
 
     @Override protected void onDestroy() {
@@ -222,6 +238,10 @@ public class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (code == PERMISSION_REQUEST && hasBluetoothPermissions()) startWatchService();
+        if (code == HEALTH_REQUEST && healthCallback != null) {
+            healthCallback.done(HealthSync.granted(this));
+            healthCallback = null;
+        }
         if (code == LOCATION_REQUEST && locationCallback != null) {
             boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
             if (granted) Weather.rememberLocation(this);

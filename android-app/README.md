@@ -19,6 +19,23 @@ While the watch is connected, the app syncs by itself, even when the app is clos
 
 Data is stored on the phone in `watchdata.json` (about a month of readings). The watch commands come from the MoYoung / Da Fit protocol as reverse-engineered by Gadgetbridge (see `WatchProtocol.java`).
 
+## Google accounts, Drive backup and Google Fit
+
+- **Sign in with Google** (one or more accounts) on the welcome screen or in *Watch → Google accounts & backup*. The app shows your name and photo, and backs up `watchdata.json` to each account's hidden **Drive app folder** every 6 hours (only this app can see it). *Restore from this backup* brings it back on a new phone.
+- **Google Fit / Health Connect** (Android 14+): after each sync the app writes steps, distance, active calories, heart rate and sleep to Health Connect, which Google Fit, Samsung Health and others read. Health Connect is per phone, so every health app on the phone can use the same data.
+
+### One-time Google Cloud setup (needed for sign-in)
+
+Google only lets an app sign in once it's registered. Nothing needs to be pasted into the app; Google recognises it by package name and signing certificate.
+
+1. Go to <https://console.cloud.google.com/>, create a project (e.g. *Watch Link*).
+2. **APIs & Services → Library**: enable **Google Drive API**.
+3. **APIs & Services → OAuth consent screen**: *External*, app name *Watch Link*, your email as support/developer contact. Under **Test users**, add every Google account you'll sign in with.
+4. **Credentials → Create credentials → OAuth client ID → Android**:
+   - Package name: `net.pictakshay.watchlink`
+   - SHA-1: `7D:A4:1B:22:45:2B:56:A3:4E:03:D8:92:6E:89:75:E2:27:F0:EE:A1`
+5. Save. Sign-in works within a few minutes. Until then the app says *developer error 10* and offers "Continue without an account".
+
 ### Permissions it asks for
 
 - **Nearby devices** (Bluetooth), **Notifications** (the status notification).
