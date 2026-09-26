@@ -174,8 +174,8 @@ window.addEventListener("unhandledrejection", e => { const s = document.getEleme
 setTimeout(() => { if (!window.watchLinkReady) { const s = document.getElementById("support"); s.textContent = "The page\'s main script didn\'t load, so the buttons won\'t work. This usually means an old copy is cached: close this tab and open the page again (or wait 10 minutes and reload). If it stays, send a screenshot to Claude."; s.hidden = false; } }, 4000);
 </script>
 <script type="module">
-import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261630"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
-import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261630";
+import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261730"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
+import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261730";
 
 const $ = id => document.getElementById(id);
 const HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
@@ -191,7 +191,8 @@ function recall(k) { try { return localStorage.getItem(k) || ""; } catch (_) { r
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function today() { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 // Bluefy (iPad) reports UUIDs in upper case; Chrome in lower case. Compare in lower case.
-const uid = u => String(u).toLowerCase();
+// Some browsers also give short 16-bit forms ("180D"), so expand those to the full UUID.
+const uid = u => normalizeUuid(String(u)) || String(u).toLowerCase();
 function bytesOf(dv) { return new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength); }
 
 function log(kind, uuid, bytes, note) {
@@ -201,9 +202,34 @@ function log(kind, uuid, bytes, note) {
   const el = $("log"); el.textContent += line; el.scrollTop = el.scrollHeight;
 }
 
+// Remembered between visits (this browser only): the last watch's details and readings,
+// so the page shows them straight away, before (or without) reconnecting.
+const CACHE_KEY = "watchlink.cache";
+function loadCache() { try { return JSON.parse(recall(CACHE_KEY) || "null"); } catch (_) { return null; } }
+function saveCache(extra = {}) {
+  if (!device?.name) return;
+  const prev = loadCache() || {};
+  store(CACHE_KEY, JSON.stringify({ ...prev, name: device.name, info: { ...(prev.info || {}), ...deviceInfo }, seenAt: new Date().toISOString(), ...extra }));
+}
+function ago(iso) {
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+}
+
 function renderDevice() {
   const rows = [["Name", device?.name || "Unknown"], ...Object.entries(deviceInfo)];
   $("device").innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+  if (device?.gatt?.connected) saveCache();
+}
+
+function renderCached() {
+  const c = loadCache();
+  if (!c || device?.gatt?.connected) return;
+  const rows = [["Name", c.name], ...Object.entries(c.info || {}).filter(([k]) => k !== "Note"), ["Last seen", ago(c.seenAt)]];
+  if (c.bpm) rows.push(["Last heart rate", `${c.bpm} bpm`]);
+  if (c.rest) rows.push(["Last resting est.", `${c.rest} bpm`]);
+  $("device").innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("") +
+    `<dt></dt><dd class="muted" style="font-family:var(--body)">Saved from your last connection</dd>`;
 }
 
 function renderHr() {
@@ -215,6 +241,7 @@ function renderHr() {
   $("hrAvg").textContent = Math.round(v.reduce((a, b) => a + b, 0) / v.length);
   const rest = restingEstimate(hrSamples);
   $("hrRest").textContent = rest ?? "–";
+  saveCache({ bpm: v[v.length - 1], ...(rest != null ? { rest } : {}) });
   const mins = Math.round((hrSamples[hrSamples.length - 1].t - hrSamples[0].t) / 60000);
   $("hrState").textContent = `${v.length} readings · ${mins} min`;
   if (rest != null) {
@@ -344,30 +371,69 @@ async function reconnectSaved() {
   }
   const watch = saved.find(d => /noise/i.test(d.name || "")) || saved[0];
   log("info", "", null, `saved devices: ${saved.map(d => d.name || d.id).join(", ")}; using ${watch.name || watch.id}`);
-  await openDevice(watch, true);
+  await openDevice(watch, { fromSaved: true });
 }
 
-async function openDevice(d, fromSaved) {
+// A web page loses its Bluetooth connection when it closes or reloads, and browsers need a tap
+// before a first connection. Within those limits: reconnect by itself after a drop, and on
+// page load reconnect to a watch picked before (where the browser supports getDevices).
+let userDisconnected = false, retryTimer = null;
+const MAX_RETRIES = 6;
+
+function scheduleReconnect(attempt) {
+  clearTimeout(retryTimer);
+  if (userDisconnected || !device) return;
+  if (attempt > MAX_RETRIES) {
+    $("connState").textContent = "Disconnected";
+    log("info", "", null, "gave up reconnecting; tap Connect or Reconnect saved watch");
+    return;
+  }
+  const delay = Math.min(30000, 2000 * 2 ** (attempt - 1));
+  $("connState").textContent = `Reconnecting in ${Math.round(delay / 1000)} s (try ${attempt} of ${MAX_RETRIES})`;
+  retryTimer = setTimeout(async () => {
+    if (!(await openDevice(device, { quiet: true, keepData: true }))) scheduleReconnect(attempt + 1);
+  }, delay);
+}
+
+// Returns true when connected. quiet: no banner on failure (used for automatic attempts).
+async function openDevice(d, { fromSaved = false, quiet = false, keepData = false } = {}) {
   device = d;
+  userDisconnected = false;
+  clearTimeout(retryTimer);
   if (!device.watchLinkListening) {
     device.watchLinkListening = true;
     device.addEventListener("gattserverdisconnected", () => {
       $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; setBusy(false);
-      log("info", "", null, "disconnected");
+      log("info", "", null, userDisconnected ? "disconnected" : "connection dropped");
+      saveCache(); renderCached();
+      if (!userDisconnected) scheduleReconnect(1);
     });
   }
   $("connState").textContent = "Connecting…"; setBusy(true);
-  deviceInfo = {}; hrSamples = []; renderDevice();
+  if (!keepData) { deviceInfo = {}; hrSamples = []; }
+  renderDevice();
   try {
     const server = await device.gatt.connect();
     $("connState").textContent = "Connected"; $("disconnectBtn").disabled = false;
     log("info", "", null, `connected to ${device.name || device.id}`);
     await explore(server);
+    return true;
   } catch (e) {
     $("connState").textContent = "Couldn't connect"; setBusy(false);
     log("error", "", null, errorText(e) + " (Is NoiseFit still connected to the watch?)");
-    if (fromSaved) showProblem(`Couldn't reach the saved watch: ${errorText(e)}. Make sure it's nearby and awake. If it keeps failing, NoiseFit may be holding the only connection. Close NoiseFit and try again.`);
+    if (fromSaved && !quiet) showProblem(`Couldn't reach the saved watch: ${errorText(e)}. Make sure it's nearby and awake. If it keeps failing, NoiseFit may be holding the only connection. Close NoiseFit and try again.`);
+    return false;
   }
+}
+
+async function autoReconnectOnLoad() {
+  if (!navigator.bluetooth?.getDevices) return;   // e.g. Bluefy: one tap on Connect is still needed
+  let saved = [];
+  try { saved = await navigator.bluetooth.getDevices(); } catch (_) { return; }
+  const watch = saved.find(d => /noise/i.test(d.name || ""));
+  if (!watch) return;
+  log("info", "", null, `reconnecting to saved watch ${watch.name}`);
+  await openDevice(watch, { quiet: true });
 }
 
 $("connectBtn").onclick = () => connect(false);
@@ -382,19 +448,23 @@ function chooseFace(bytes, name) {
     faceFile = null; $("faceChosen").textContent = `${name} doesn't look like a MoYoung watch face file.`;
   } else {
     faceFile = bytes; faceName = name;
+    if (builtInFace(name)) store("watchlink.face", name);
     $("faceChosen").textContent = `Chosen: ${name} (${Math.round(bytes.length / 1024)} KB)`;
   }
   refreshUpload();
 }
 function refreshUpload() { $("uploadBtn").disabled = uploading || !faceFile; }
 
-document.querySelectorAll("[data-face]").forEach(b => b.onclick = async () => {
+const builtInFace = name => [...document.querySelectorAll("[data-face]")].some(b => b.dataset.face === name);
+async function loadBuiltInFace(name) {
   try {
-    const res = await fetch(`../watch-faces/live/${b.dataset.face}`);
+    const res = await fetch(`../watch-faces/live/${name}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    chooseFace(new Uint8Array(await res.arrayBuffer()), b.dataset.face);
-  } catch (e) { $("faceChosen").textContent = `Couldn't load ${b.dataset.face}: ${errorText(e)}`; }
-});
+    chooseFace(new Uint8Array(await res.arrayBuffer()), name);
+  } catch (e) { $("faceChosen").textContent = `Couldn't load ${name}: ${errorText(e)}`; }
+}
+document.querySelectorAll("[data-face]").forEach(b => b.onclick = () => loadBuiltInFace(b.dataset.face));
+if (builtInFace(recall("watchlink.face"))) loadBuiltInFace(recall("watchlink.face"));
 $("faceInput").onchange = async e => {
   const f = e.target.files[0];
   if (f) chooseFace(new Uint8Array(await f.arrayBuffer()), f.name);
@@ -453,7 +523,10 @@ $("uploadBtn").onclick = uploadFace;
 $("packetSize").value = recall("watchlink.packet") || (/iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? "180" : "244");
 $("packetSize").onchange = () => store("watchlink.packet", $("packetSize").value);
 $("savedBtn").onclick = reconnectSaved;
-$("disconnectBtn").onclick = () => device?.gatt?.connected && device.gatt.disconnect();
+$("disconnectBtn").onclick = () => {
+  userDisconnected = true; clearTimeout(retryTimer);
+  if (device?.gatt?.connected) device.gatt.disconnect();
+};
 $("copyBtn").onclick = async () => {
   try { await navigator.clipboard.writeText($("handoff").textContent); $("copyBtn").textContent = "Copied"; setTimeout(() => $("copyBtn").textContent = "Copy", 1500); }
   catch (_) { $("copyBtn").textContent = "Select and copy manually"; }
@@ -465,6 +538,7 @@ $("exportBtn").onclick = () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 $("extra").value = recall("watchlink.extra");
+renderCached();
 
 // ---------- support check ----------
 function showProblem(html) { const s = $("support"); s.innerHTML = html; s.hidden = false; }
@@ -482,6 +556,7 @@ window.watchLinkReady = true;
   for (let i = 0; i < 15 && !navigator.bluetooth; i++) await new Promise(r => setTimeout(r, 200));
   if (!navigator.bluetooth) { showProblem(noBluetoothMessage()); return; }
   try { if (navigator.bluetooth.getAvailability && !(await navigator.bluetooth.getAvailability())) showProblem("Bluetooth looks off or unavailable. Turn it on and reload."); } catch (_) {}
+  autoReconnectOnLoad();
 })();
 </script>
 </body>

@@ -40,6 +40,14 @@ Safari, and every other iPad or iPhone browser, can't use Web Bluetooth, because
 
 Either way, the watch accepts only one Bluetooth connection at a time. Disconnect it from your phone (and close NoiseFit) before connecting from the iPad, and the other way round.
 
+## Staying connected
+
+A web page loses its Bluetooth connection when it closes or reloads, and browsers need a tap before a page's first connection. Within those limits, Watch Link:
+
+- **Reconnects by itself after a drop.** It retries 6 times, waiting 2 s, 4 s, 8 s and so on up to 30 s. Tapping Disconnect stops the retries.
+- **Reconnects on page load** to a watch picked before, where the browser supports `navigator.bluetooth.getDevices()` (Chrome, sometimes behind a flag). Bluefy on iPad still needs one tap on Connect to watch.
+- **Remembers** (in this browser only) the watch's name, details, last heart rate, resting estimate and when it was last seen, plus your chosen face and packet size, and shows them before it reconnects.
+
 ## Uploading watch faces (experimental)
 
 The **Upload watch face** panel sends a MoYoung-format face file (`.bin`) to the watch, with no laptop needed. It uses the same protocol as [dawfu](https://github.com/david47k/dawfu): a size header on `fee2`, the watch requesting 244-byte chunks on `fee3`, and chunks written to `fee6`. When the upload finishes, the page switches the watch to the uploaded face.
