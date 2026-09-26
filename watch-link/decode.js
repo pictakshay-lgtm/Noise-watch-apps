@@ -31,10 +31,27 @@ export const STD_CHARS = {
 
 // Services Web Bluetooth may open. It only exposes services listed up front, so this
 // includes vendor services common on budget smartwatches as well as the standard ones.
+// All as full 128-bit strings: Chrome accepts 16-bit numbers too, but other Web Bluetooth
+// browsers (e.g. Bluefy on iPad) can reject them.
 export const CANDIDATE_SERVICES = [
   ...Object.keys(STD_SERVICES),
-  0xfee0, 0xfee1, 0xfee7, 0xfeea, 0xfff0, 0xffe0, 0xae00, 0xae30, 0xd0ff, 0x190e, 0x3802,
+  ...["fee0", "fee1", "fee7", "feea", "fff0", "ffe0", "ae00", "ae30", "d0ff", "190e", "3802"].map(s => `0000${s}-0000-1000-8000-00805f9b34fb`),
 ];
+
+// The minimum a MoYoung watch needs: vendor service, device info, battery, heart rate.
+export const ESSENTIAL_SERVICES = ["feea", "180a", "180f", "180d"].map(s => `0000${s}-0000-1000-8000-00805f9b34fb`);
+
+// Readable text for errors from any browser, including ones that reject with a bare string or object.
+export function errorText(e) {
+  if (e == null) return "unknown error";
+  if (typeof e === "string") return e;
+  const parts = [e.name, e.message].filter(Boolean);
+  if (parts.length) return parts.join(": ");
+  const text = String(e);
+  if (text !== "[object Object]") return text;
+  try { const json = JSON.stringify(e); if (json && json !== "{}") return json; } catch (_) {}
+  return "no details from the browser";
+}
 
 const TEXT_CHARS = new Set(["2a29", "2a24", "2a25", "2a26", "2a27", "2a28", "2a00"]);
 
