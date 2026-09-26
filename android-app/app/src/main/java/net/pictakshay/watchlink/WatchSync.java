@@ -124,10 +124,19 @@ final class WatchSync {
             data.setLastSync(System.currentTimeMillis(), "ok");
             status = "synced";
             publish();
+            afterSync();
             releaseWakeLock();
         }, HR_TIMEOUT_MS + 2000);
 
         if (System.currentTimeMillis() - data.weatherSentAt() > WEATHER_INTERVAL_MS - 60_000L) sendWeather(null);
+    }
+
+    /** Copies the new data to Health Connect (Google Fit etc.) and backs it up to Google Drive. */
+    void afterSync() {
+        if (HealthSync.enabled(svc) && HealthSync.granted(svc)) {
+            HealthSync.write(svc, data.json(), net, (err, n) -> main.post(() -> { HealthSync.recordError(svc, err); publish(); }));
+        }
+        GoogleAccounts.backupAll(svc, false, (err, r) -> publish());
     }
 
     void findWatch() { send(WatchProtocol.packet(WatchProtocol.CMD_FIND_MY_WATCH, new byte[0])); }

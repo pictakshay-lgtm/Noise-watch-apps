@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Watch Link privacy</title>
+<style>
+  :root { color-scheme: light; --bg: #f3f4f6; --text: #0b0b0b; --text-2: #52514e; --card: #fff; }
+  @media (prefers-color-scheme: dark) { :root { color-scheme: dark; --bg: #0e0f11; --text: #fff; --text-2: #c3c2b7; --card: #1a1a19; } }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+  img { width: 48px; height: 48px; border-radius: 12px; }
+  h1 { font-size: 24px; margin: 12px 0 4px; }
+  h2 { font-size: 17px; margin: 24px 0 6px; }
+  p, li { color: var(--text-2); }
+  section { background: var(--card); border-radius: 16px; padding: 4px 16px 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <img src="logo.svg" alt="">
+  <h1>How Watch Link uses your data</h1>
+  <p>Watch Link is a personal app that connects your Noise watch to your phone. It has no servers of its own and doesn't sell or share your data.</p>
+  <section>
+    <h2>Health data</h2>
+    <ul>
+      <li>Steps, distance, calories, heart rate, sleep and battery are read from your watch over Bluetooth and stored on your phone.</li>
+      <li>If you connect <b>Health Connect</b>, the app writes that data there so apps you choose (like Google Fit) can show it. It only writes; it doesn't read other apps' health data.</li>
+    </ul>
+    <h2>Google account</h2>
+    <ul>
+      <li>If you sign in with Google, the app uses your name and photo to personalise the screen.</li>
+      <li>Backups go to a hidden app folder in <b>your own</b> Google Drive, which only Watch Link can see. It can't see your other files.</li>
+    </ul>
+    <h2>Ask Claude</h2>
+    <ul>
+      <li>When you ask a question, a summary of your watch data is sent with it to Anthropic's Claude API using your own API key.</li>
+    </ul>
+    <h2>Weather and music</h2>
+    <ul>
+      <li>Your city or approximate location is sent to Open-Meteo to get the forecast.</li>
+      <li>Notification access, if you allow it, is used only to see the song that's playing.</li>
+    </ul>
+    <h2>Removing your data</h2>
+    <ul>
+      <li>Uninstalling the app deletes everything on the phone. Remove the Drive backup in Google Drive → Settings → Manage apps, and Health Connect data in Settings → Health Connect.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

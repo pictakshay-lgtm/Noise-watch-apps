@@ -47,7 +47,8 @@ public class BleBridge {
 
     /** Methods for the app's own panels (sync, weather, music, Claude); they don't need Bluetooth permission. */
     private static final List<String> APP_METHODS = Arrays.asList("appData", "music", "openMusicApp", "songOnWatch",
-        "notificationAccess", "claudeKey", "askClaude", "weatherCity", "weatherUseLocation", "setUploading");
+        "notificationAccess", "claudeKey", "askClaude", "weatherCity", "weatherUseLocation", "setUploading",
+        "addGoogleAccount", "removeGoogleAccount", "backupNow", "restoreBackup", "skipSignIn", "healthConnect", "healthDisconnect", "healthSyncNow");
 
     BleBridge(MainActivity activity, WebView web) {
         this.activity = activity;
@@ -129,7 +130,10 @@ public class BleBridge {
                     .put("hasClaudeKey", !prefs().getString("claudeKey", "").isEmpty())
                     .put("claudeModel", ClaudeChat.MODEL)
                     .put("weatherPlace", Weather.hasPlace(activity))
-                    .put("weatherCity", prefs().getString("weatherCity", ""));
+                    .put("weatherCity", prefs().getString("weatherCity", ""))
+                    .put("accounts", GoogleAccounts.describeAccounts(activity))
+                    .put("signInSkipped", GoogleAccounts.signInSkipped(activity))
+                    .put("health", HealthSync.status(activity));
                 result.ok(o);
                 break;
             }
@@ -189,6 +193,35 @@ public class BleBridge {
                     if (!Weather.hasPlace(activity)) { result.fail("NotFoundError", "The phone has no recent location yet. Open Maps once, or type a city."); return; }
                     result.ok(null);
                     if (service.isReady()) service.sync().sendWeather(null);
+                });
+                break;
+            case "addGoogleAccount":
+                GoogleAccounts.add(activity, (err, acct) -> { if (err != null) result.fail("NetworkError", err); else result.ok(acct); });
+                break;
+            case "removeGoogleAccount": GoogleAccounts.remove(activity, a.optString("email")); result.ok(null); break;
+            case "skipSignIn": GoogleAccounts.skipSignIn(activity); result.ok(null); break;
+            case "backupNow":
+                GoogleAccounts.backupAll(activity, true, (err, r) -> { if (err != null) result.fail("NetworkError", err); else result.ok(null); });
+                break;
+            case "restoreBackup":
+                GoogleAccounts.restore(activity, a.optString("email"), sync.data(), (err, r) -> { if (err != null) result.fail("NetworkError", err); else result.ok(null); });
+                break;
+            case "healthConnect":
+                if (!HealthSync.supported()) { result.fail("NotSupportedError", "Health Connect needs Android 14 or newer."); break; }
+                activity.requestHealth(granted -> {
+                    if (!granted) { result.fail("SecurityError", "Health Connect access wasn't allowed. You can allow it in Settings > Health Connect."); return; }
+                    HealthSync.setEnabled(activity, true);
+                    HealthSync.write(activity, sync.data().json(), activity.getMainExecutor(), (err, n) -> {
+                        HealthSync.recordError(activity, err);
+                        if (err != null) result.fail("NetworkError", err); else result.ok(n);
+                    });
+                });
+                break;
+            case "healthDisconnect": HealthSync.setEnabled(activity, false); result.ok(null); break;
+            case "healthSyncNow":
+                HealthSync.write(activity, sync.data().json(), activity.getMainExecutor(), (err, n) -> {
+                    HealthSync.recordError(activity, err);
+                    if (err != null) result.fail("NetworkError", err); else result.ok(n);
                 });
                 break;
             default: result.fail("NotSupportedError", "Unknown method " + method);

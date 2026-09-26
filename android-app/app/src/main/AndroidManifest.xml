@@ -23,6 +23,15 @@
     <!-- Approximate location, only for the local weather shown on the watch. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- Health Connect (Android 14+): write the watch's steps, distance, calories, heart rate and sleep. -->
+    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
+    <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
+    <uses-permission android:name="android.permission.health.WRITE_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.WRITE_SLEEP" />
+    <!-- Lists the Google accounts on the phone for "Add Google account". -->
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" android:maxSdkVersion="25" />
+
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <!-- So the app can open Spotify / YouTube Music (Android 11+ package visibility). -->
@@ -54,6 +63,18 @@
             android:name=".BleService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!-- Health Connect requires a screen explaining how health data is used. -->
+        <activity-alias
+            android:name=".HealthPrivacy"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <receiver android:name=".SyncReceiver" android:exported="false" />
 

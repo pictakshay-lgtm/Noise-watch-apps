@@ -45,6 +45,7 @@ android {
 dependencies {
     implementation 'androidx.webkit:webkit:1.11.0'
     implementation 'com.anthropic:anthropic-java:2.65.0'   // Ask Claude
+    implementation 'com.google.android.gms:play-services-auth:21.2.0'   // Google sign-in + Drive backup
 }
 
 def copyWebAssets = tasks.register('copyWebAssets', Copy) {
