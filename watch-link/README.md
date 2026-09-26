@@ -40,6 +40,16 @@ Safari, and every other iPad or iPhone browser, can't use Web Bluetooth, because
 
 Either way, the watch accepts only one Bluetooth connection at a time. Disconnect it from your phone (and close NoiseFit) before connecting from the iPad, and the other way round.
 
+## Uploading watch faces (experimental)
+
+The **Upload watch face** panel sends a MoYoung-format face file (`.bin`) to the watch, with no laptop needed. It uses the same protocol as [dawfu](https://github.com/david47k/dawfu): a size header on `fee2`, the watch requesting 244-byte chunks on `fee3`, and chunks written to `fee6`. When the upload finishes, the page switches the watch to the uploaded face.
+
+1. Connect to the watch (Connect to watch, or Reconnect saved watch).
+2. Pick **One Dark Live** or **Web Live** (from [`watch-faces/live/`](../watch-faces/live/)), or choose your own `.bin` file.
+3. Tap **Upload to watch** and keep the page open until it finishes.
+
+The upload stops if the watch reports a platform other than `MOYOUNG-V2`. It hasn't been tested on a real Noise Icon 2 yet. Some phones' Bluetooth may not allow the 244-byte packets these watches use, in which case use dawfu on a laptop instead.
+
 ## Decoding steps and sleep
 
 1. Connect, tap **Listen** on each unknown characteristic, and sync something on the watch, for example walk a few steps.
@@ -49,4 +59,5 @@ Either way, the watch accepts only one Bluetooth connection at a time. Disconnec
 ## Files
 
 - `index.html`: the page.
+- `upload.js`: the watch face upload protocol. It has no browser code and is tested with Node.
 - `decode.js`: standard Bluetooth decoders and the resting heart rate estimate. It has no browser code, so it can be tested with Node.
