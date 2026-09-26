@@ -8,6 +8,7 @@ Real watch faces with **live data**, not just a background photo. They use the M
 |---|---|
 | `onedark_live.bin` | Time, day and date, a live steps progress ring, steps, heart rate and battery %. Black and navy with Galaxy-style colours. |
 | `web_live.bin` | The same layout on the navy, red and web background. |
+| `tiny_test.bin` | A 4 KB test: blue, green and red blocks, no clock. 16 chunks, so an upload takes seconds and quickly shows whether the watch accepts faces at all. Built by `tiny.py`. |
 
 The preview is rendered from the finished `.bin` files with sample values (10:08, SAT 26, 6420 steps, 72 bpm, 85%).
 

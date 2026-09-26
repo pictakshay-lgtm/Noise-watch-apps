@@ -85,6 +85,7 @@ public class BleBridge {
                 case "requestDevice": pickDevice(a, result); break;
                 case "connect": service.connect(a.getString("id"), result); break;
                 case "disconnect": service.disconnect(); result.ok(null); break;
+                case "mtu": result.ok(service.mtu()); break;
                 case "services": result.ok(service.services()); break;
                 case "characteristics": result.ok(service.characteristics(a.getString("service"))); break;
                 case "read": service.read(a.getString("service"), a.getString("char"), result); break;

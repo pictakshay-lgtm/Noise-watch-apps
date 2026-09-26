@@ -139,4 +139,5 @@
   };
   Object.defineProperty(navigator, "bluetooth", { value: bluetooth, configurable: true });
   window.watchLinkApp = true;
+  window.watchLinkMtu = () => call("mtu");   // bytes per write = MTU - 3
 })();

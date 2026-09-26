@@ -5,6 +5,8 @@
 //      reply by writing that 244-byte slice of the file to fee6.
 //   3. The watch notifies FE EA 20 09 74 + checksum (u32) when it has everything; acknowledge with
 //      FE EA 20 09 74 00 00 00 00, then switch to the uploaded face (slot 13) with FE EA 20 06 19 0D.
+//   Some firmware never asks for chunks. If nothing arrives within `pushAfterMs`, the file is pushed
+//   in order instead, the way DaFup does it, and the finish commands are sent afterwards.
 // No browser APIs here, so it can be tested with Node.
 
 export const CHUNK_SIZE = 244;
@@ -23,7 +25,12 @@ export function prepCommand(size) {
 export class FaceUploader {
   // packetSize: bytes per BLE write. The watch always counts in 244-byte chunks; on phones whose
   // Bluetooth can't send 244 bytes at once (often iPads), each chunk is split across several writes.
-  constructor(file, { send, sendFile, onProgress = () => {}, onEvent = () => {}, packetSize = CHUNK_SIZE, timeoutMs = 20000 }) {
+  constructor(file, { send, sendFile, onProgress = () => {}, onEvent = () => {}, packetSize = CHUNK_SIZE, timeoutMs = 20000,
+                      pushAfterMs = 4000, pushGapMs = 30, sleep = ms => new Promise(r => setTimeout(r, ms)) }) {
+    this.pushAfterMs = pushAfterMs;
+    this.pushGapMs = pushGapMs;
+    this.sleep = sleep;
+    this.pushing = false;
     this.packetSize = Math.max(20, Math.min(CHUNK_SIZE, packetSize));
     this.onEvent = onEvent;
     this.lastChunk = -1;
@@ -41,7 +48,51 @@ export class FaceUploader {
   async start() {
     this.armTimeout();
     await this.send(prepCommand(this.file.length));
+    if (this.pushAfterMs > 0) this.pushTimer = setTimeout(() => this.push(), this.pushAfterMs);
     return this.done;
+  }
+
+  // Fallback for watches that don't request chunks: send the whole file in order.
+  async push() {
+    if (this.finished || this.lastChunk >= 0) return;
+    this.pushing = true;
+    this.onEvent(`watch didn't ask for data within ${this.pushAfterMs / 1000} s; pushing the file in order instead`);
+    try {
+      for (let n = 0; n < this.chunkCount; n++) {
+        if (!this.pushing || this.finished) return;   // the watch started asking after all, or it ended
+        this.armTimeout();
+        await this.sendChunk(n);
+        this.onProgress(Math.min(1, ((n + 1) * CHUNK_SIZE) / this.file.length));
+        if (this.pushGapMs) await this.sleep(this.pushGapMs);
+      }
+      if (!this.pushing || this.finished) return;
+      this.onEvent("whole file pushed; waiting for the watch to confirm");
+      await this.sleep(3000);
+      if (this.finished) return;
+      this.onEvent("no confirmation from the watch; sending the finish commands anyway");
+      await this.complete(null);
+    } catch (err) {
+      this.fail(err);
+    }
+  }
+
+  async sendChunk(n) {
+    const start = n * CHUNK_SIZE;
+    const chunk = this.file.subarray(start, Math.min(start + CHUNK_SIZE, this.file.length));
+    for (let i = 0; i < chunk.length; i += this.packetSize) await this.sendFile(chunk.subarray(i, i + this.packetSize));
+  }
+
+  async complete(checksum) {
+    this.finished = true;
+    this.pushing = false;
+    clearTimeout(this.timer);
+    clearTimeout(this.pushTimer);
+    try {
+      await this.send(Uint8Array.from([...PREP, 0, 0, 0, 0]));
+      await this.send(Uint8Array.from(SHOW_UPLOADED_FACE));
+    } catch (err) { this.reject(err); return; }
+    this.onProgress(1);
+    this.resolve(checksum);
   }
 
   armTimeout() {
@@ -54,7 +105,9 @@ export class FaceUploader {
   fail(err) {
     if (this.finished) return;
     this.finished = true;
+    this.pushing = false;
     clearTimeout(this.timer);
+    clearTimeout(this.pushTimer);
     this.reject(err);
   }
 
@@ -63,24 +116,20 @@ export class FaceUploader {
     try {
       if (startsWith(bytes, CHUNK_REQ) && bytes.length >= 7) {
         this.armTimeout();
+        clearTimeout(this.pushTimer);
+        this.pushing = false;
         const n = (bytes[5] << 8) | bytes[6];
         const start = n * CHUNK_SIZE;
         if (start >= this.file.length) throw new Error(`The watch asked for chunk ${n}, past the end of the file.`);
         this.expected = n + 1;
         this.lastChunk = n;
         if (n === 0 || n % 200 === 0) this.onEvent(`watch asked for chunk ${n + 1} of ${this.chunkCount}`);
-        const chunk = this.file.subarray(start, Math.min(start + CHUNK_SIZE, this.file.length));
-        for (let i = 0; i < chunk.length; i += this.packetSize) await this.sendFile(chunk.subarray(i, i + this.packetSize));
+        await this.sendChunk(n);
         this.onProgress(Math.min(1, (start + CHUNK_SIZE) / this.file.length));
       } else if (startsWith(bytes, PREP) && bytes.length >= 9) {
         const checksum = ((bytes[5] << 24) | (bytes[6] << 16) | (bytes[7] << 8) | bytes[8]) >>> 0;
-        this.finished = true;
-        clearTimeout(this.timer);
         this.onEvent(`watch reports all data received (checksum ${checksum.toString(16)})`);
-        await this.send(Uint8Array.from([...PREP, 0, 0, 0, 0]));
-        await this.send(Uint8Array.from(SHOW_UPLOADED_FACE));
-        this.onProgress(1);
-        this.resolve(checksum);
+        await this.complete(checksum);
       }
       // Anything else is unrelated fee3 traffic (activity updates etc.); ignore it.
     } catch (err) {
