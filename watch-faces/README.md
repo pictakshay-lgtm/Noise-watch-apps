@@ -23,3 +23,7 @@ The rings and tiles are part of the picture. They don't show live data, because 
 ## Editing
 
 `source.html` holds the SVG for all three faces. Open it in a browser to edit, or render new PNGs at 240 × 286 with any headless browser, for example a Playwright element screenshot of each `.face` element.
+
+## Live faces
+
+[`live/`](live/) has experimental faces in the MoYoung binary format with a real clock, steps, heart rate and battery. They're uploaded from a laptop instead of as a photo.
