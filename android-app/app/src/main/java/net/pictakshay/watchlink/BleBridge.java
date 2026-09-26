@@ -48,7 +48,7 @@ public class BleBridge {
     /** Methods for the app's own panels (sync, weather, music, Claude); they don't need Bluetooth permission. */
     private static final List<String> APP_METHODS = Arrays.asList("appData", "music", "openMusicApp", "songOnWatch",
         "notificationAccess", "claudeKey", "askClaude", "weatherCity", "weatherUseLocation", "setUploading",
-        "addGoogleAccount", "removeGoogleAccount", "backupNow", "restoreBackup", "skipSignIn", "healthConnect", "healthDisconnect", "healthSyncNow");
+        "claudeLogin", "claudeLogout", "skipClaudeLogin", "addGoogleAccount", "removeGoogleAccount", "backupNow", "restoreBackup", "skipSignIn", "healthConnect", "healthDisconnect", "healthSyncNow");
 
     BleBridge(MainActivity activity, WebView web) {
         this.activity = activity;
@@ -132,7 +132,8 @@ public class BleBridge {
                     .put("weatherPlace", Weather.hasPlace(activity))
                     .put("weatherCity", prefs().getString("weatherCity", ""))
                     .put("accounts", GoogleAccounts.describeAccounts(activity))
-                    .put("signInSkipped", GoogleAccounts.signInSkipped(activity))
+                    .put("signInSkipped", prefs().getBoolean("claudeLoginSkipped", false))
+                    .put("userName", prefs().getString("userName", ""))
                     .put("health", HealthSync.status(activity));
                 result.ok(o);
                 break;
@@ -195,6 +196,29 @@ public class BleBridge {
                     if (service.isReady()) service.sync().sendWeather(null);
                 });
                 break;
+            case "claudeLogin": {
+                String key = a.optString("key").trim(), name = a.optString("name").trim();
+                if (!key.startsWith("sk-ant-")) { result.fail("TypeError", "Anthropic API keys start with sk-ant-. Copy it from console.anthropic.com → API keys."); break; }
+                background.execute(() -> {
+                    try {
+                        ClaudeChat.validate(key);
+                        prefs().edit().putString("claudeKey", key).putString("userName", name).apply();
+                        main.post(() -> result.ok(name));
+                    } catch (RuntimeException e) {
+                        main.post(() -> result.fail("SecurityError", String.valueOf(e.getMessage())));
+                    }
+                });
+                break;
+            }
+            case "claudeLogout": prefs().edit().remove("claudeKey").putBoolean("claudeLoginSkipped", false).apply(); result.ok(null); break;
+            case "skipClaudeLogin": {
+                String name = a.optString("name").trim();
+                android.content.SharedPreferences.Editor e = prefs().edit().putBoolean("claudeLoginSkipped", true);
+                if (!name.isEmpty()) e.putString("userName", name);
+                e.apply();
+                result.ok(null);
+                break;
+            }
             case "addGoogleAccount":
                 GoogleAccounts.add(activity, (err, acct) -> { if (err != null) result.fail("NetworkError", err); else result.ok(acct); });
                 break;

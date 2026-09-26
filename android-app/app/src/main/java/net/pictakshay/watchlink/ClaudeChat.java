@@ -33,6 +33,25 @@ final class ClaudeChat {
     private ClaudeChat() { }
 
     /**
+     * Checks an API key without spending anything: listing the available models is free.
+     * Throws IllegalStateException with a readable message if the key doesn't work.
+     */
+    static void validate(String apiKey) {
+        AnthropicClient client = AnthropicOkHttpClient.builder().apiKey(apiKey).timeout(Duration.ofSeconds(30)).maxRetries(1).build();
+        try {
+            client.models().list();
+        } catch (UnauthorizedException e) {
+            throw new IllegalStateException("That API key wasn't accepted. Copy it again from console.anthropic.com.");
+        } catch (AnthropicIoException e) {
+            throw new IllegalStateException("Couldn't reach Anthropic. Check the phone's internet connection.");
+        } catch (AnthropicServiceException e) {
+            throw new IllegalStateException("Anthropic returned error " + e.statusCode() + ". Try again in a moment.");
+        } finally {
+            client.close();
+        }
+    }
+
+    /**
      * @param apiKey   the user's Anthropic API key
      * @param history  [{role: "user"|"assistant", text}], oldest first, ending with the new question
      * @param dataDigest WatchData.summary() output

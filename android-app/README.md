@@ -19,9 +19,13 @@ While the watch is connected, the app syncs by itself, even when the app is clos
 
 Data is stored on the phone in `watchdata.json` (about a month of readings). The watch commands come from the MoYoung / Da Fit protocol as reverse-engineered by Gadgetbridge (see `WatchProtocol.java`).
 
-## Google accounts, Drive backup and Google Fit
+## Signing in
 
-- **Sign in with Google** (one or more accounts) on the welcome screen or in *Watch → Google accounts & backup*. The app shows your name and photo, and backs up `watchdata.json` to each account's hidden **Drive app folder** every 6 hours (only this app can see it). *Restore from this backup* brings it back on a new phone.
+The welcome screen signs you in **with Claude**: your first name and an Anthropic API key (from console.anthropic.com → API keys). The key is checked with a free call (listing models), stored only on the phone, and powers Ask Claude; the name personalises the app. *Skip for now* works too; sign in later from *Watch → Claude account*.
+
+## Google accounts, Drive backup and Google Fit (optional)
+
+- **Google accounts** (one or more), optional, in *Watch → Google accounts & backup*. The app shows your name and photo, and backs up `watchdata.json` to each account's hidden **Drive app folder** every 6 hours (only this app can see it). *Restore from this backup* brings it back on a new phone.
 - **Google Fit / Health Connect** (Android 14+): after each sync the app writes steps, distance, active calories, heart rate and sleep to Health Connect, which Google Fit, Samsung Health and others read. Health Connect is per phone, so every health app on the phone can use the same data.
 
 ### One-time Google Cloud setup (needed for sign-in)
