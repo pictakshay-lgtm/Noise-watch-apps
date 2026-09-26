@@ -17,11 +17,24 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Weather and Ask Claude go online; the 15-minute sync wakes the phone briefly. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Approximate location, only for the local weather shown on the watch. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+
+    <!-- So the app can open Spotify / YouTube Music (Android 11+ package visibility). -->
+    <queries>
+        <package android:name="com.spotify.music" />
+        <package android:name="com.google.android.apps.youtube.music" />
+    </queries>
 
     <application
         android:label="Watch Link"
-        android:icon="@android:drawable/stat_sys_data_bluetooth"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="false"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
@@ -41,5 +54,18 @@
             android:name=".BleService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <receiver android:name=".SyncReceiver" android:exported="false" />
+
+        <!-- Lets the user grant notification access, which Android requires to read the current song. -->
+        <service
+            android:name=".NowPlayingService"
+            android:exported="true"
+            android:label="Watch Link (song on watch)"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
