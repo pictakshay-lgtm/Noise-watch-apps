@@ -93,10 +93,12 @@ li{margin:3px 0}
       <input id="extra" placeholder="e.g. fee7, 0000d0ff-3c17-d293-8e48-14fe2e4da212" autocomplete="off" spellcheck="false">
     </label>
     <p class="muted" style="font-size:13px"><b>Connect to watch</b> lists only Noise and MOYOUNG-based watches. If the list is empty, the watch is still connected to the phone or NoiseFit. <b>Show all devices</b> lists everything nearby.</p>
+    <p class="muted" style="font-size:13px"><b>Reconnect saved watch</b> skips the scan and connects straight to a watch you've picked before, so it can work even while the watch is connected to your phone or NoiseFit. Pick the watch once with <b>Connect to watch</b> first.</p>
     <p class="muted" style="font-size:13px">Chrome only opens the services it's told about in advance. If the watch has services that don't show up below, find their UUIDs with the free <i>nRF Connect</i> app and add them here.</p>
     <div class="btns">
       <button class="primary" id="connectBtn" type="button">Connect to watch</button>
       <button id="allBtn" type="button">Show all devices</button>
+      <button id="savedBtn" type="button">Reconnect saved watch</button>
       <button id="disconnectBtn" type="button" disabled>Disconnect</button>
     </div>
   </section>
@@ -262,15 +264,23 @@ async function explore(server) {
 }
 
 // ---------- connect ----------
-async function connect(showAll) {
-  if (!navigator.bluetooth) { showProblem(noBluetoothMessage()); return; }
+function optionalServiceList() {
   const extra = $("extra").value.split(",").map(s => s.trim()).filter(Boolean);
   const bad = extra.filter(s => !normalizeUuid(s));
-  if (bad.length) { alert(`These aren't valid UUIDs: ${bad.join(", ")}`); return; }
+  if (bad.length) { alert(`These aren't valid UUIDs: ${bad.join(", ")}`); return null; }
   store("watchlink.extra", $("extra").value);
-  const optionalServices = [...new Set([...CANDIDATE_SERVICES, ...extra.map(normalizeUuid)])];
+  return [...new Set([...CANDIDATE_SERVICES, ...extra.map(normalizeUuid)])];
+}
+
+function setBusy(busy) { ["connectBtn", "allBtn", "savedBtn"].forEach(id => $(id).disabled = busy); }
+
+async function connect(showAll) {
+  if (!navigator.bluetooth) { showProblem(noBluetoothMessage()); return; }
+  const optionalServices = optionalServiceList();
+  if (!optionalServices) return;
+  let picked;
   try {
-    device = await navigator.bluetooth.requestDevice(showAll
+    picked = await navigator.bluetooth.requestDevice(showAll
       ? { acceptAllDevices: true, optionalServices }
       : { filters: [{ services: [MOYOUNG] }, { namePrefix: "Noise" }], optionalServices });
   } catch (e) {
@@ -278,11 +288,38 @@ async function connect(showAll) {
     if (e.name !== "NotFoundError") { log("error", "", null, e.message); showProblem(`Couldn't open the device list: ${e.message}`); }
     return;
   }
-  device.addEventListener("gattserverdisconnected", () => {
-    $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; $("connectBtn").disabled = false; $("allBtn").disabled = false;
-    log("info", "", null, "disconnected");
-  });
-  $("connState").textContent = "Connecting…"; $("connectBtn").disabled = true; $("allBtn").disabled = true;
+  await openDevice(picked);
+}
+
+// Connects to a watch picked in an earlier visit without scanning. A watch that's already
+// connected to the phone doesn't advertise, so it never appears in the chooser.
+async function reconnectSaved() {
+  if (!navigator.bluetooth) { showProblem(noBluetoothMessage()); return; }
+  if (!navigator.bluetooth.getDevices) {
+    showProblem("This browser can't reconnect to saved devices yet. In Chrome, open <b>chrome://flags</b>, search for <b>Web Bluetooth new permissions backend</b>, set it to <b>Enabled</b>, restart Chrome, then pick the watch once with Connect to watch.");
+    return;
+  }
+  let saved = [];
+  try { saved = await navigator.bluetooth.getDevices(); } catch (e) { showProblem(`Couldn't read saved devices: ${e.message}`); return; }
+  if (!saved.length) {
+    showProblem("No saved watch yet. Free the watch once (disconnect it in phone Bluetooth settings and close NoiseFit), pick it with <b>Connect to watch</b>, and after that <b>Reconnect saved watch</b> works even while NoiseFit is connected.");
+    return;
+  }
+  const watch = saved.find(d => /noise/i.test(d.name || "")) || saved[0];
+  log("info", "", null, `saved devices: ${saved.map(d => d.name || d.id).join(", ")}; using ${watch.name || watch.id}`);
+  await openDevice(watch, true);
+}
+
+async function openDevice(d, fromSaved) {
+  device = d;
+  if (!device.watchLinkListening) {
+    device.watchLinkListening = true;
+    device.addEventListener("gattserverdisconnected", () => {
+      $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; setBusy(false);
+      log("info", "", null, "disconnected");
+    });
+  }
+  $("connState").textContent = "Connecting…"; setBusy(true);
   deviceInfo = {}; hrSamples = []; renderDevice();
   try {
     const server = await device.gatt.connect();
@@ -290,13 +327,15 @@ async function connect(showAll) {
     log("info", "", null, `connected to ${device.name || device.id}`);
     await explore(server);
   } catch (e) {
-    $("connState").textContent = "Couldn't connect"; $("connectBtn").disabled = false; $("allBtn").disabled = false;
+    $("connState").textContent = "Couldn't connect"; setBusy(false);
     log("error", "", null, e.message + " (Is NoiseFit still connected to the watch?)");
+    if (fromSaved) showProblem(`Couldn't reach the saved watch: ${e.message}. Make sure it's nearby and awake. If it keeps failing, NoiseFit may be holding the only connection. Close NoiseFit and try again.`);
   }
 }
 
 $("connectBtn").onclick = () => connect(false);
 $("allBtn").onclick = () => connect(true);
+$("savedBtn").onclick = reconnectSaved;
 $("disconnectBtn").onclick = () => device?.gatt?.connected && device.gatt.disconnect();
 $("copyBtn").onclick = async () => {
   try { await navigator.clipboard.writeText($("handoff").textContent); $("copyBtn").textContent = "Copied"; setTimeout(() => $("copyBtn").textContent = "Copy", 1500); }
