@@ -141,6 +141,13 @@ li{margin:3px 0}
     </div>
     <p class="muted" style="font-size:13px" id="faceChosen">No face chosen.</p>
     <div class="btns">
+      <label class="small" style="display:inline-flex;align-items:center;gap:6px">Packet size
+        <select id="packetSize" style="width:auto;padding:4px 8px">
+          <option value="244">244 (standard)</option>
+          <option value="180">180 (try on iPad)</option>
+          <option value="120">120</option>
+          <option value="20">20 (slowest)</option>
+        </select></label>
       <button class="primary" type="button" id="uploadBtn" disabled>Upload to watch</button>
       <progress id="uploadProgress" max="100" value="0" style="flex:1;min-width:120px" hidden></progress>
     </div>
@@ -167,8 +174,8 @@ window.addEventListener("unhandledrejection", e => { const s = document.getEleme
 setTimeout(() => { if (!window.watchLinkReady) { const s = document.getElementById("support"); s.textContent = "The page\'s main script didn\'t load, so the buttons won\'t work. This usually means an old copy is cached: close this tab and open the page again (or wait 10 minutes and reload). If it stays, send a screenshot to Claude."; s.hidden = false; } }, 4000);
 </script>
 <script type="module">
-import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261613"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
-import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261613";
+import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261630"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
+import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261630";
 
 const $ = id => document.getElementById(id);
 const HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
@@ -183,6 +190,8 @@ function store(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
 function recall(k) { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function today() { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+// Bluefy (iPad) reports UUIDs in upper case; Chrome in lower case. Compare in lower case.
+const uid = u => String(u).toLowerCase();
 function bytesOf(dv) { return new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength); }
 
 function log(kind, uuid, bytes, note) {
@@ -229,13 +238,13 @@ async function readChar(ch, out) {
     const desc = describeValue(ch.uuid, bytes);
     out.textContent = desc != null ? `${desc}  (${toHex(bytes)})` : toHex(bytes) || "(empty)";
     log("read", ch.uuid, bytes, desc || "");
-    if (INFO[ch.uuid] && desc) { deviceInfo[INFO[ch.uuid]] = desc; renderDevice(); }
+    if (INFO[uid(ch.uuid)] && desc) { deviceInfo[INFO[uid(ch.uuid)]] = desc; renderDevice(); }
   } catch (e) { out.textContent = `Couldn't read: ${errorText(e)}`; log("error", ch.uuid, null, errorText(e)); }
 }
 
 async function listen(ch, out, btn) {
   try {
-    if (ch.uuid === HR_CHAR) ch.addEventListener("characteristicvaluechanged", onHr);
+    if (uid(ch.uuid) === HR_CHAR) ch.addEventListener("characteristicvaluechanged", onHr);
     else ch.addEventListener("characteristicvaluechanged", ev => {
       const bytes = bytesOf(ev.target.value); const desc = describeValue(ch.uuid, bytes);
       out.textContent = desc != null ? `${desc}  (${toHex(bytes)})` : toHex(bytes);
@@ -250,7 +259,7 @@ async function listen(ch, out, btn) {
 async function explore(server) {
   let services = [];
   try { services = await server.getPrimaryServices(); } catch (e) { log("error", "", null, "No services opened: " + errorText(e)); }
-  if (!services.some(s => s.uuid === MOYOUNG)) {
+  if (!services.some(s => uid(s.uuid) === MOYOUNG)) {
     deviceInfo.Note = "No Noise/MOYOUNG service (feea) found. This may not be your watch; disconnect and try again.";
   }
   renderDevice();
@@ -260,7 +269,7 @@ async function explore(server) {
 
   for (const svc of services) {
     const det = document.createElement("details"); det.open = true;
-    det.innerHTML = `<summary>${esc(STD_SERVICES[svc.uuid] || "Vendor service")} <span class="props">${esc(shortId(svc.uuid))}</span></summary>`;
+    det.innerHTML = `<summary>${esc(STD_SERVICES[uid(svc.uuid)] || "Vendor service")} <span class="props">${esc(shortId(svc.uuid))}</span></summary>`;
     box.appendChild(det);
     let chars = [];
     try { chars = await svc.getCharacteristics(); } catch (e) { det.insertAdjacentHTML("beforeend", `<p class="muted">Couldn't list: ${esc(errorText(e))}</p>`); continue; }
@@ -268,12 +277,12 @@ async function explore(server) {
       const p = ch.properties;
       const props = ["read", "write", "writeWithoutResponse", "notify", "indicate"].filter(k => p[k]).join(" · ");
       const row = document.createElement("div"); row.className = "char";
-      row.innerHTML = `<div><b>${esc(STD_CHARS[ch.uuid] || "Unknown")}</b> <code>${esc(shortId(ch.uuid))}</code></div><div class="props">${esc(props)}</div><div class="val muted">–</div><div class="btns"></div>`;
+      row.innerHTML = `<div><b>${esc(STD_CHARS[uid(ch.uuid)] || "Unknown")}</b> <code>${esc(shortId(ch.uuid))}</code></div><div class="props">${esc(props)}</div><div class="val muted">–</div><div class="btns"></div>`;
       const out = row.querySelector(".val"), btns = row.querySelector(".btns");
       if (p.read) { const b = document.createElement("button"); b.className = "small"; b.type = "button"; b.textContent = "Read"; b.onclick = () => readChar(ch, out); btns.appendChild(b); await readChar(ch, out); }
       if (p.notify || p.indicate) {
         const b = document.createElement("button"); b.className = "small"; b.type = "button"; b.textContent = "Listen"; b.onclick = () => listen(ch, out, b); btns.appendChild(b);
-        if (ch.uuid === HR_CHAR) await listen(ch, out, b);
+        if (uid(ch.uuid) === HR_CHAR) await listen(ch, out, b);
       }
       det.appendChild(row);
     }
@@ -415,20 +424,25 @@ async function uploadFace() {
     const [send, sendFile] = [await svc.getCharacteristic(FEE(2)), await svc.getCharacteristic(FEE(6))];
     notify = await svc.getCharacteristic(FEE(3));
     const write = c => b => (c.writeValueWithoutResponse ? c.writeValueWithoutResponse(b) : c.writeValue(b));
+    const packetSize = Number($("packetSize").value) || 244;
     const up = new FaceUploader(faceFile, {
-      send: write(send), sendFile: write(sendFile),
+      send: write(send), sendFile: write(sendFile), packetSize,
+      onEvent: text => log("info", FEE(3), null, text),
       onProgress: p => { $("uploadProgress").value = Math.round(p * 100); msg(`Uploading… ${Math.round(p * 100)}%`); },
     });
     onNotify = ev => up.handle(bytesOf(ev.target.value));
     notify.addEventListener("characteristicvaluechanged", onNotify);
     await notify.startNotifications();
-    log("info", FEE(3), null, `face upload started: ${faceName}, ${faceFile.length} bytes`);
+    log("info", FEE(3), null, `face upload started: ${faceName}, ${faceFile.length} bytes, packets of ${packetSize}`);
     const checksum = await up.start();
     log("info", FEE(3), null, `face upload finished, watch checksum ${checksum.toString(16)}`);
     msg(`Done. The watch received ${faceName} (checksum ${checksum.toString(16)}) and should now show it. If it doesn't, pick the gallery / custom face on the watch.`);
   } catch (e) {
     log("error", FEE(3), null, `face upload failed: ${errorText(e)}`);
-    msg(`Upload failed: ${errorText(e)}${/length|size|GATT/i.test(errorText(e)) ? " This phone's Bluetooth may not allow the 244-byte packets these watches use; try the dawfu tool on a laptop instead." : ""}`);
+    const hint = /stopped responding/.test(errorText(e)) && $("packetSize").value === "244"
+      ? " If this is an iPad or iPhone, set Packet size to 180 and try again."
+      : /length|size|GATT/i.test(errorText(e)) ? " Try a smaller Packet size, or the dawfu tool on a laptop." : "";
+    msg(`Upload failed: ${errorText(e)}${hint}`);
   } finally {
     if (notify && onNotify) notify.removeEventListener("characteristicvaluechanged", onNotify);
     uploading = false; refreshUpload(); setBusy(!!device?.gatt?.connected);
@@ -436,6 +450,8 @@ async function uploadFace() {
   }
 }
 $("uploadBtn").onclick = uploadFace;
+$("packetSize").value = recall("watchlink.packet") || (/iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) ? "180" : "244");
+$("packetSize").onchange = () => store("watchlink.packet", $("packetSize").value);
 $("savedBtn").onclick = reconnectSaved;
 $("disconnectBtn").onclick = () => device?.gatt?.connected && device.gatt.disconnect();
 $("copyBtn").onclick = async () => {

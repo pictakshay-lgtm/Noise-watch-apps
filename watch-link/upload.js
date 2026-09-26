@@ -21,7 +21,13 @@ export function prepCommand(size) {
 // Drives one upload. `send(bytes)` writes to fee2, `sendFile(bytes)` writes to fee6.
 // Feed every fee3 notification to handle(); it resolves `done` with the watch's checksum.
 export class FaceUploader {
-  constructor(file, { send, sendFile, onProgress = () => {}, timeoutMs = 20000 }) {
+  // packetSize: bytes per BLE write. The watch always counts in 244-byte chunks; on phones whose
+  // Bluetooth can't send 244 bytes at once (often iPads), each chunk is split across several writes.
+  constructor(file, { send, sendFile, onProgress = () => {}, onEvent = () => {}, packetSize = CHUNK_SIZE, timeoutMs = 20000 }) {
+    this.packetSize = Math.max(20, Math.min(CHUNK_SIZE, packetSize));
+    this.onEvent = onEvent;
+    this.lastChunk = -1;
+    this.chunkCount = Math.ceil(file.length / CHUNK_SIZE);
     this.file = file;
     this.send = send;
     this.sendFile = sendFile;
@@ -40,7 +46,9 @@ export class FaceUploader {
 
   armTimeout() {
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.fail(new Error("The watch stopped responding. Keep it close and awake, then try again.")), this.timeoutMs);
+    this.timer = setTimeout(() => this.fail(new Error(this.lastChunk < 0
+      ? "The watch stopped responding before asking for any data. Keep it close and awake, then try again."
+      : `The watch stopped responding after chunk ${this.lastChunk + 1} of ${this.chunkCount}. Keep it close and awake, then try again.`)), this.timeoutMs);
   }
 
   fail(err) {
@@ -59,12 +67,16 @@ export class FaceUploader {
         const start = n * CHUNK_SIZE;
         if (start >= this.file.length) throw new Error(`The watch asked for chunk ${n}, past the end of the file.`);
         this.expected = n + 1;
-        await this.sendFile(this.file.subarray(start, Math.min(start + CHUNK_SIZE, this.file.length)));
+        this.lastChunk = n;
+        if (n === 0 || n % 200 === 0) this.onEvent(`watch asked for chunk ${n + 1} of ${this.chunkCount}`);
+        const chunk = this.file.subarray(start, Math.min(start + CHUNK_SIZE, this.file.length));
+        for (let i = 0; i < chunk.length; i += this.packetSize) await this.sendFile(chunk.subarray(i, i + this.packetSize));
         this.onProgress(Math.min(1, (start + CHUNK_SIZE) / this.file.length));
       } else if (startsWith(bytes, PREP) && bytes.length >= 9) {
         const checksum = ((bytes[5] << 24) | (bytes[6] << 16) | (bytes[7] << 8) | bytes[8]) >>> 0;
         this.finished = true;
         clearTimeout(this.timer);
+        this.onEvent(`watch reports all data received (checksum ${checksum.toString(16)})`);
         await this.send(Uint8Array.from([...PREP, 0, 0, 0, 0]));
         await this.send(Uint8Array.from(SHOW_UPLOADED_FACE));
         this.onProgress(1);
