@@ -113,9 +113,6 @@
     },
     event(json) {
       const ev = JSON.parse(json);
-      // Every native event also goes to the page as a "watchlink" window event (sync data, songs, connection).
-      window.dispatchEvent(new CustomEvent("watchlink", { detail: ev }));
-      if (ev.type === "app") return;
       const d = devices.get(ev.id); if (!d) return;
       if (ev.type === "notify") {
         const c = d._chars.get(`${full(ev.service)}|${full(ev.char)}`); if (!c) return;
@@ -143,5 +140,4 @@
   Object.defineProperty(navigator, "bluetooth", { value: bluetooth, configurable: true });
   window.watchLinkApp = true;
   window.watchLinkMtu = () => call("mtu");   // bytes per write = MTU - 3
-  window.watchLinkNative = (method, args) => call(method, args);   // the app's own features: sync, music, weather, Claude
 })();

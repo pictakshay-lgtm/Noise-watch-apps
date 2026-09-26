@@ -112,6 +112,8 @@ li{margin:3px 0}
     <section class="panel" aria-labelledby="hrH">
       <div class="head"><h2 id="hrH">Heart rate</h2><span class="eyebrow" id="hrState">Waiting</span></div>
       <div class="big" id="bpm">–<small>bpm</small></div>
+      <div class="btns"><button type="button" class="primary" id="measureBtn">Measure now</button>
+        <span class="muted" id="measureMsg" role="status" style="font-size:13px">Asks the watch to take a reading (about 30 seconds).</span></div>
       <div class="stats">
         <div class="stat"><span class="eyebrow">Low</span><b id="hrMin">–</b></div>
         <div class="stat"><span class="eyebrow">Avg</span><b id="hrAvg">–</b></div>
@@ -258,6 +260,47 @@ function onHr(ev) {
   log("notify", HR_CHAR, bytes, hr ? `${hr.bpm} bpm` : "");
   if (hr && hr.bpm > 25 && hr.bpm < 230 && hr.contact !== false) { hrSamples.push({ t: Date.now(), bpm: hr.bpm }); renderHr(); }
 }
+
+// ---------- measure on demand ----------
+// The Icon 2 doesn't stream the standard heart-rate characteristic. Instead, ask it to take a
+// reading with its own command (MoYoung CMD 0x6D: FE EA 20 06 6D 00 = start, ... FF = stop).
+// The watch answers on fee3 with FE EA 20 06 6D <bpm> once the reading is done.
+async function measureHr() {
+  const msg = t => { $("measureMsg").textContent = t; };
+  if (!device?.gatt?.connected) { msg("Connect to the watch first."); return; }
+  let svc;
+  try { svc = await device.gatt.getPrimaryService(MOYOUNG); }
+  catch (_) { msg("This watch doesn't have the MoYoung service (feea)."); return; }
+  const out = await svc.getCharacteristic(FEE(2)), inn = await svc.getCharacteristic(FEE(3));
+  const send = bytes => { const b = Uint8Array.from(bytes); log("write", FEE(2), b, ""); return out.writeValueWithoutResponse ? out.writeValueWithoutResponse(b) : out.writeValue(b); };
+  let timer, done = false;
+  const finish = async text => {
+    if (done) return; done = true;
+    clearTimeout(timer);
+    inn.removeEventListener("characteristicvaluechanged", onPacket);
+    try { await send([0xfe, 0xea, 0x20, 0x06, 0x6d, 0xff]); } catch (_) {}
+    msg(text); $("measureBtn").disabled = false;
+  };
+  const onPacket = ev => {
+    const b = bytesOf(ev.target.value);
+    log("notify", FEE(3), b, "reply while measuring");
+    if (b.length >= 6 && b[0] === 0xfe && b[1] === 0xea && b[4] === 0x6d && b[5] > 25 && b[5] < 230) {
+      hrSamples.push({ t: Date.now(), bpm: b[5] }); renderHr();
+      finish(`Measured ${b[5]} bpm at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+    }
+  };
+  $("measureBtn").disabled = true;
+  msg("Measuring… keep the watch snug on your wrist (about 30 seconds).");
+  try {
+    inn.addEventListener("characteristicvaluechanged", onPacket);
+    await inn.startNotifications();
+    await send([0xfe, 0xea, 0x20, 0x06, 0x6d, 0x00]);
+    timer = setTimeout(() => finish("No reading from the watch after 60 seconds. Send a screenshot of the event log below."), 60000);
+  } catch (e) {
+    finish(`Couldn't start a measurement: ${errorText(e)}`);
+  }
+}
+$("measureBtn").onclick = measureHr;
 
 // ---------- explorer ----------
 async function readChar(ch, out) {
@@ -489,7 +532,6 @@ async function uploadFace() {
 
   let notify, onNotify, heard = 0;
   uploading = true; refreshUpload(); setBusy(true);
-  window.watchLinkNative?.("setUploading", { on: true }).catch(() => {});
   $("uploadProgress").hidden = false; $("uploadProgress").value = 0;
   msg("Starting upload…");
   try {
@@ -532,7 +574,6 @@ async function uploadFace() {
   } finally {
     if (notify && onNotify) notify.removeEventListener("characteristicvaluechanged", onNotify);
     uploading = false; refreshUpload(); setBusy(!!device?.gatt?.connected);
-    window.watchLinkNative?.("setUploading", { on: false }).catch(() => {});
     if (device?.gatt?.connected) $("disconnectBtn").disabled = false;
   }
 }

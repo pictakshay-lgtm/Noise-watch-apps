@@ -13,7 +13,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.webkit.JsPromptResult;
 import android.webkit.JsResult;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -39,12 +38,8 @@ import java.util.List;
  */
 public class MainActivity extends Activity {
     static final String ORIGIN = "https://appassets.androidplatform.net";
-    static final String START_PAGE = ORIGIN + "/assets/watch-link/app/index.html";
+    static final String START_PAGE = ORIGIN + "/assets/watch-link/index.html";
     private static final int PERMISSION_REQUEST = 1;
-    private static final int LOCATION_REQUEST = 2;
-
-    interface Granted { void done(boolean granted); }
-    private Granted locationCallback;
 
     private WebView web;
     private BleBridge bridge;
@@ -90,24 +85,6 @@ public class MainActivity extends Activity {
                     .show();
                 return true;
             }
-            @Override public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {
-                android.widget.EditText input = new android.widget.EditText(MainActivity.this);
-                input.setText(defaultValue);
-                input.setSelectAllOnFocus(true);
-                if (defaultValue != null && defaultValue.matches("\\d+")) input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-                android.widget.FrameLayout box = new android.widget.FrameLayout(MainActivity.this);
-                int pad = (int) (20 * getResources().getDisplayMetrics().density);
-                box.setPadding(pad, pad / 2, pad, 0);
-                box.addView(input);
-                new AlertDialog.Builder(MainActivity.this)
-                    .setTitle(message)
-                    .setView(box)
-                    .setPositiveButton(android.R.string.ok, (d, w) -> result.confirm(input.getText().toString()))
-                    .setNegativeButton(android.R.string.cancel, (d, w) -> result.cancel())
-                    .setOnCancelListener(d -> result.cancel())
-                    .show();
-                return true;
-            }
             @Override public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
                 new AlertDialog.Builder(MainActivity.this)
                     .setMessage(message)
@@ -122,8 +99,8 @@ public class MainActivity extends Activity {
                 Uri url = request.getUrl();
                 // Add the Bluetooth polyfill before the page's own scripts run.
                 String path = url.getPath() == null ? "" : url.getPath();
-                if (path.startsWith("/assets/watch-link/") && (path.endsWith("/") || path.endsWith(".html"))) {
-                    WebResourceResponse page = injectPolyfill(path.substring("/assets/".length()) + (path.endsWith("/") ? "index.html" : ""));
+                if (path.endsWith("/watch-link/") || path.endsWith("/watch-link/index.html")) {
+                    WebResourceResponse page = injectPolyfill();
                     if (page != null) return page;
                 }
                 return loader.shouldInterceptRequest(url);
@@ -140,23 +117,7 @@ public class MainActivity extends Activity {
 
         requestBluetoothPermissions();
         bindService(new Intent(this, BleService.class), connection, Context.BIND_AUTO_CREATE);
-        boolean privacy = getIntent() != null && "android.intent.action.VIEW_PERMISSION_USAGE".equals(getIntent().getAction());
-        web.loadUrl(privacy ? ORIGIN + "/assets/watch-link/app/privacy.html" : START_PAGE);
-    }
-
-    @Override protected void onResume() {
-        super.onResume();
-        Weather.rememberLocation(this);   // only possible while the app is on screen
-    }
-
-    /** Asks for approximate location (for local weather on the watch). */
-    void requestLocation(Granted callback) {
-        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            callback.done(true);
-            return;
-        }
-        locationCallback = callback;
-        requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_REQUEST);
+        web.loadUrl(START_PAGE);
     }
 
     @Override protected void onDestroy() {
@@ -171,9 +132,9 @@ public class MainActivity extends Activity {
         if (web.canGoBack()) web.goBack(); else super.onBackPressed();
     }
 
-    private WebResourceResponse injectPolyfill(String asset) {
+    private WebResourceResponse injectPolyfill() {
         try {
-            String html = readAsset(asset);
+            String html = readAsset("watch-link/index.html");
             String tag = "<script src=\"/assets/app/ble-polyfill.js\"></script>";
             int head = html.indexOf("<head>");
             html = head >= 0 ? html.substring(0, head + 6) + tag + html.substring(head + 6) : tag + html;
@@ -223,12 +184,6 @@ public class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (code == PERMISSION_REQUEST && hasBluetoothPermissions()) startWatchService();
-        if (code == LOCATION_REQUEST && locationCallback != null) {
-            boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
-            if (granted) Weather.rememberLocation(this);
-            locationCallback.done(granted);
-            locationCallback = null;
-        }
     }
 
     /** Starts the service in the foreground; it reconnects to the last watch on its own. */

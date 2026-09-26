@@ -64,15 +64,6 @@ public class BleService extends Service {
     private static final UUID CCCD = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     static final String ACTION_DISCONNECT = "net.pictakshay.watchlink.DISCONNECT";
 
-    /** The running service, for the sync alarm. Null when it isn't running. */
-    static BleService instance;
-
-    /** For operations nobody waits on. */
-    static final Result IGNORE = new Result() {
-        @Override public void ok(Object value) { }
-        @Override public void fail(String name, String message) { }
-    };
-
     private final IBinder binder = new LocalBinder();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Deque<Op> queue = new ArrayDeque<>();
@@ -86,15 +77,8 @@ public class BleService extends Service {
     private int retries;
     private Op current;
     private int mtu = 23;   // negotiated on connect; a write can carry mtu - 3 bytes
-    private WatchSync sync;
 
     // ---------- lifecycle ----------
-
-    @Override public void onCreate() {
-        super.onCreate();
-        instance = this;
-        sync = new WatchSync(this);
-    }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
 
@@ -112,32 +96,11 @@ public class BleService extends Service {
     }
 
     @Override public void onDestroy() {
-        if (instance == this) instance = null;
-        sync.shutdown();
         closeGatt();
         super.onDestroy();
     }
 
     void setListener(Listener l) { listener = l; }
-
-    WatchSync sync() { return sync; }
-
-    boolean isReady() { return ready && gatt != null; }
-
-    /** Sends one protocol packet, split into writes that fit the link. Fire and forget. */
-    void writePacket(String service, String characteristic, byte[] packet) {
-        if (!isReady()) return;
-        BluetoothGattService s = gatt.getService(UUID.fromString(service));
-        BluetoothGattCharacteristic c = s == null ? null : s.getCharacteristic(UUID.fromString(characteristic));
-        if (c == null) return;
-        boolean noResponse = (c.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0;
-        for (byte[] f : WatchProtocol.fragments(packet, mtu - 3)) write(service, characteristic, f, !noResponse, IGNORE);
-    }
-
-    /** Tells the page something app-level happened (new data synced, song changed, …). */
-    void emitApp(String kind, JSONObject data) {
-        try { emit(new JSONObject().put("type", "app").put("kind", kind).put("data", data)); } catch (JSONException ignored) { }
-    }
 
     // ---------- public API (called on the main thread) ----------
 
@@ -187,7 +150,6 @@ public class BleService extends Service {
         userDisconnected = true;
         main.removeCallbacksAndMessages(null);
         boolean wasConnected = ready;
-        sync.onDisconnected();
         closeGatt();
         failAll("NetworkError", "Disconnected");
         if (wasConnected || device != null) emit("disconnected");
@@ -289,7 +251,6 @@ public class BleService extends Service {
                     g.close();
                     gatt = null;
                     failQueue("NetworkError", "The watch disconnected");
-                    sync.onDisconnected();
                     if (wasReady) emit("disconnected");
                     if (!userDisconnected && device != null) scheduleReconnect();
                 }
@@ -313,7 +274,6 @@ public class BleService extends Service {
                 for (Result r : new ArrayList<>(waitingForConnect)) r.ok(null);
                 waitingForConnect.clear();
                 emit("connected");
-                sync.onReady();
             });
         }
 
@@ -353,7 +313,6 @@ public class BleService extends Service {
         String ch = c.getUuid().toString();
         String b64 = Base64.encodeToString(value, Base64.NO_WRAP);
         main.post(() -> {
-            sync.onNotify(ch, value);
             try {
                 emit(new JSONObject().put("type", "notify").put("service", service).put("char", ch).put("value", b64));
             } catch (JSONException ignored) { }
@@ -463,7 +422,7 @@ public class BleService extends Service {
         PendingIntent stop = PendingIntent.getService(this, 1,
             new Intent(this, BleService.class).setAction(ACTION_DISCONNECT), PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_watch)
+            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle("Watch Link")
             .setContentText(text)
             .setContentIntent(open)

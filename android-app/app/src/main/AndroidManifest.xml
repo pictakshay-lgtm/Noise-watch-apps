@@ -17,26 +17,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Weather and Ask Claude go online; the 15-minute sync wakes the phone briefly. -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- Approximate location, only for the local weather shown on the watch. -->
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
-
-    <!-- So the app can open Spotify / YouTube Music (Android 11+ package visibility). -->
-    <queries>
-        <package android:name="com.spotify.music" />
-        <package android:name="com.google.android.apps.youtube.music" />
-        <package android:name="com.anthropic.claude" />
-    </queries>
 
     <application
         android:label="Watch Link"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:icon="@android:drawable/stat_sys_data_bluetooth"
         android:allowBackup="false"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
@@ -56,9 +41,5 @@
             android:name=".BleService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
-
-
-        <receiver android:name=".SyncReceiver" android:exported="false" />
-
     </application>
 </manifest>
