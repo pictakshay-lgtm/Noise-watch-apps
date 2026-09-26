@@ -174,8 +174,8 @@ window.addEventListener("unhandledrejection", e => { const s = document.getEleme
 setTimeout(() => { if (!window.watchLinkReady) { const s = document.getElementById("support"); s.textContent = "The page\'s main script didn\'t load, so the buttons won\'t work. This usually means an old copy is cached: close this tab and open the page again (or wait 10 minutes and reload). If it stays, send a screenshot to Claude."; s.hidden = false; } }, 4000);
 </script>
 <script type="module">
-import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261715"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
-import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261715";
+import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261730"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
+import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261730";
 
 const $ = id => document.getElementById(id);
 const HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
@@ -191,7 +191,8 @@ function recall(k) { try { return localStorage.getItem(k) || ""; } catch (_) { r
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function today() { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 // Bluefy (iPad) reports UUIDs in upper case; Chrome in lower case. Compare in lower case.
-const uid = u => String(u).toLowerCase();
+// Some browsers also give short 16-bit forms ("180D"), so expand those to the full UUID.
+const uid = u => normalizeUuid(String(u)) || String(u).toLowerCase();
 function bytesOf(dv) { return new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength); }
 
 function log(kind, uuid, bytes, note) {
