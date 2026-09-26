@@ -489,6 +489,7 @@ async function uploadFace() {
 
   let notify, onNotify, heard = 0;
   uploading = true; refreshUpload(); setBusy(true);
+  window.watchLinkNative?.("setUploading", { on: true }).catch(() => {});
   $("uploadProgress").hidden = false; $("uploadProgress").value = 0;
   msg("Starting upload…");
   try {
@@ -531,6 +532,7 @@ async function uploadFace() {
   } finally {
     if (notify && onNotify) notify.removeEventListener("characteristicvaluechanged", onNotify);
     uploading = false; refreshUpload(); setBusy(!!device?.gatt?.connected);
+    window.watchLinkNative?.("setUploading", { on: false }).catch(() => {});
     if (device?.gatt?.connected) $("disconnectBtn").disabled = false;
   }
 }
