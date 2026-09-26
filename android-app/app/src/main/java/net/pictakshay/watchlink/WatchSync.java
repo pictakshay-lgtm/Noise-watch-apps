@@ -23,8 +23,7 @@ import java.util.concurrent.Executors;
  *    last night's sleep and the two previous days' steps and sleep;
  *  - every 4 hours (and whenever the watch asks): today's weather and a 7-day forecast;
  *  - on every connection: the time;
- *  - always: the watch's music buttons control the phone's music, and optionally the current
- *    song is shown on the watch.
+ *  - always: the watch's music buttons control the phone's music.
  * Everything lands in {@link WatchData}; the page is told with an "app" event so it can refresh.
  * All methods run on the main thread.
  */
@@ -66,7 +65,6 @@ final class WatchSync {
         svc.setNotify(WatchProtocol.SERVICE, WatchProtocol.DATA_IN, true, BleService.IGNORE);
         svc.setNotify(WatchProtocol.SERVICE, WatchProtocol.STEPS_CHAR, true, BleService.IGNORE);
         send(WatchProtocol.syncTime(System.currentTimeMillis(), TimeZone.getDefault()));
-        music.watchSongs(this::onSong);
         scheduleNext();
         main.postDelayed(() -> sync("connected"), 3000);
     }
@@ -80,7 +78,6 @@ final class WatchSync {
 
     void shutdown() {
         cancelAlarm();
-        music.stop();
         net.shutdownNow();
         releaseWakeLock();
     }
@@ -124,19 +121,10 @@ final class WatchSync {
             data.setLastSync(System.currentTimeMillis(), "ok");
             status = "synced";
             publish();
-            afterSync();
             releaseWakeLock();
         }, HR_TIMEOUT_MS + 2000);
 
         if (System.currentTimeMillis() - data.weatherSentAt() > WEATHER_INTERVAL_MS - 60_000L) sendWeather(null);
-    }
-
-    /** Copies the new data to Health Connect (Google Fit etc.) and backs it up to Google Drive. */
-    void afterSync() {
-        if (HealthSync.enabled(svc) && HealthSync.granted(svc)) {
-            HealthSync.write(svc, data.json(), net, (err, n) -> main.post(() -> { HealthSync.recordError(svc, err); publish(); }));
-        }
-        GoogleAccounts.backupAll(svc, false, (err, r) -> publish());
     }
 
     void findWatch() { send(WatchProtocol.packet(WatchProtocol.CMD_FIND_MY_WATCH, new byte[0])); }
@@ -230,21 +218,6 @@ final class WatchSync {
         if (s == null) return;
         data.recordSteps(System.currentTimeMillis(), s[0], s[1], s[2]);
         publish();
-    }
-
-    private void onSong(String app, String title, String artist, boolean playing) {
-        try {
-            svc.emitApp("song", new JSONObject().put("app", app).put("title", title).put("artist", artist).put("playing", playing));
-        } catch (JSONException ignored) { }
-        if (playing && songOnWatch() && svc.isReady() && !uploading) {
-            send(WatchProtocol.message(WatchProtocol.MESSAGE_OTHER, app, artist.isEmpty() ? title : title + " - " + artist));
-        }
-    }
-
-    boolean songOnWatch() { return prefs().getBoolean("songOnWatch", false); }
-    void setSongOnWatch(boolean on) {
-        prefs().edit().putBoolean("songOnWatch", on).apply();
-        music.watchSongs(this::onSong);
     }
 
     // ---------- helpers ----------

@@ -232,7 +232,6 @@
 <div class="wrap">
   <header class="top">
     <img src="logo.svg" alt="" id="headLogo">
-    <img class="avatar" id="headAvatar" alt="" hidden referrerpolicy="no-referrer">
     <div class="hello">
       <h1 id="greet">Watch Link</h1>
       <div class="sub" id="subline">Your Noise watch, on your phone</div>
@@ -287,6 +286,16 @@
     </div>
 
     <div class="card">
+      <h2>Ask Claude</h2>
+      <p class="small muted" style="margin-top:0">Opens the Claude app with your watch data, covered by your Claude plan.</p>
+      <div class="chips" id="chips"></div>
+      <form id="askForm" class="row" style="margin-top:10px">
+        <input class="field" id="askInput" autocomplete="off" placeholder="Ask about your steps, sleep, heart…" aria-label="Your question">
+        <button class="btn primary" type="submit" aria-label="Ask Claude" style="padding:0 16px"><svg class="icon"><use href="#i-send"/></svg></button>
+      </form>
+    </div>
+
+    <div class="card">
       <div class="row" style="margin-bottom:12px"><h2 id="weekTitle" class="grow" style="margin:0">Steps this week</h2>
         <span class="small muted" style="display:inline-flex;align-items:center;gap:6px"><svg width="18" height="2" aria-hidden="true"><line x1="0" x2="18" y1="1" y2="1" stroke="currentColor" stroke-dasharray="3 3"/></svg><span id="goalKey">Goal</span></span></div>
       <div class="chart" id="chart"><svg id="weekSvg" role="img" aria-labelledby="weekTitle"></svg><div class="tip" id="tip"></div></div>
@@ -309,14 +318,12 @@
     <div class="card">
       <div class="now">
         <div class="art"><svg><use href="#i-music"/></svg></div>
-        <div class="grow">
-          <div class="title" id="songTitle">Nothing playing</div>
-          <div class="muted small" id="songArtist">Play something in Spotify or YouTube Music</div>
-        </div>
+        <div class="grow"><div class="title">Music controls</div>
+          <div class="muted small">Controls whatever is playing: Spotify, YouTube Music…</div></div>
       </div>
       <div class="controls">
         <button class="round" type="button" data-op="previous" aria-label="Previous track"><svg><use href="#i-prev"/></svg></button>
-        <button class="round play" type="button" data-op="playpause" aria-label="Play or pause" id="playBtn"><svg><use href="#i-play" id="playIcon"/></svg></button>
+        <button class="round play" type="button" data-op="playpause" aria-label="Play or pause" id="playBtn"><svg><use href="#i-play"/></svg></button>
         <button class="round" type="button" data-op="next" aria-label="Next track"><svg><use href="#i-next"/></svg></button>
       </div>
       <p class="small muted" style="text-align:center;margin:10px 0 0">The music buttons on your watch control the phone too.</p>
@@ -330,32 +337,9 @@
       </div>
     </div>
 
-    <div class="card">
-      <label class="switch">
-        <span class="grow"><b>Show songs on the watch</b><br><span class="small muted">Each new song pops up on the watch as a notification</span></span>
-        <input type="checkbox" class="toggle" id="songToggle">
-      </label>
-      <div id="accessRow" class="banner" style="margin:12px 0 0" hidden>
-        <svg class="icon"><use href="#i-bell"/></svg>
-        <div class="grow">Android needs <b>notification access</b> before Watch Link can see what's playing.
-          <div style="margin-top:10px"><button class="btn primary" id="accessBtn" type="button">Allow access</button></div></div>
-      </div>
-    </div>
   </section>
 
   <!-- ================= ASK CLAUDE ================= -->
-  <section role="tabpanel" id="p-claude" aria-labelledby="t-claude" hidden>
-    <div id="chatArea">
-      <div class="chat" id="chat" aria-live="polite"></div>
-      <div class="composer" id="composer">
-        <form id="askForm">
-          <input class="field" id="askInput" autocomplete="off" placeholder="Ask about your steps, sleep, heart…" aria-label="Your question">
-          <button class="btn primary" type="submit" aria-label="Send" style="padding:0 16px"><svg class="icon"><use href="#i-send"/></svg></button>
-        </form>
-      </div>
-    </div>
-  </section>
-
   <!-- ================= WATCH ================= -->
   <section role="tabpanel" id="p-watch" aria-labelledby="t-watch" hidden>
     <div class="card">
@@ -376,22 +360,6 @@
     </div>
 
     <div class="card">
-      <h2>Google accounts &amp; backup</h2>
-      <div id="acctList"></div>
-      <p class="small muted" id="acctEmpty" style="margin-top:0">Sign in to back up your watch history to your own Google Drive.</p>
-      <div class="row" style="margin-top:10px;flex-wrap:wrap">
-        <button class="btn" id="addAcctBtn" type="button"><svg class="icon"><use href="#i-google"/></svg>Add account</button>
-        <button class="btn ghost" id="backupBtn" type="button"><svg class="icon"><use href="#i-cloud"/></svg>Back up now</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Google Fit &amp; Health Connect</h2>
-      <p class="small muted" style="margin-top:0" id="hcNote">Share steps, distance, calories, heart rate and sleep with Google Fit and other health apps through Android's Health Connect.</p>
-      <button class="btn primary block" id="hcBtn" type="button"><svg class="icon"><use href="#i-fit"/></svg>Connect Health Connect</button>
-    </div>
-
-    <div class="card">
       <h2>Weather location</h2>
       <p class="small muted" style="margin-top:0" id="wxPlace">Not set yet</p>
       <form id="cityForm" class="row">
@@ -404,8 +372,6 @@
     <div class="card list">
       <a class="item" href="../#upH"><span class="ic"><svg><use href="#i-face"/></svg></span><span class="grow"><b>Watch faces</b><br><span class="small muted">Upload a custom face (experimental)</span></span><svg class="chev"><use href="#i-chev"/></svg></a>
       <a class="item" href="../"><span class="ic"><svg><use href="#i-tools"/></svg></span><span class="grow"><b>Advanced</b><br><span class="small muted">Live Bluetooth data, event log, raw services</span></span><svg class="chev"><use href="#i-chev"/></svg></a>
-      <button class="item" id="keyBtn" type="button"><span class="ic"><svg><use href="#i-spark"/></svg></span><span class="grow"><b>Claude API key</b><br><span class="small muted" id="claudeNote">Add your key to use Ask Claude</span></span></button>
-      <button class="item" id="clearChatBtn" type="button"><span class="ic"><svg><use href="#i-trash"/></svg></span><span class="grow"><b>Clear chat history</b><br><span class="small muted">Removes past questions from this phone</span></span></button>
       <button class="item" id="disconnectBtn" type="button"><span class="ic"><svg style="color:var(--heart)"><use href="#i-off"/></svg></span><span class="grow"><b style="color:var(--heart)">Disconnect</b><br><span class="small muted">Stops syncing until you connect again</span></span></button>
     </div>
   </section>
@@ -414,7 +380,6 @@
 <nav class="tabs" role="tablist" aria-label="Sections">
   <button role="tab" id="t-today" aria-controls="p-today" aria-selected="true"><span class="pillbg"><svg><use href="#i-today"/></svg></span>Today</button>
   <button role="tab" id="t-music" aria-controls="p-music" aria-selected="false"><span class="pillbg"><svg><use href="#i-music"/></svg></span>Music</button>
-  <button role="tab" id="t-claude" aria-controls="p-claude" aria-selected="false"><span class="pillbg"><svg><use href="#i-spark"/></svg></span>Ask Claude</button>
   <button role="tab" id="t-watch" aria-controls="p-watch" aria-selected="false"><span class="pillbg"><svg><use href="#i-watch"/></svg></span>Watch</button>
 </nav>
 <div class="toast" id="toast" role="status"></div>
@@ -442,11 +407,10 @@ const tabs = [...document.querySelectorAll('[role="tab"]')];
 function show(id) {
   tabs.forEach(t => { const on = t.id === id; t.setAttribute("aria-selected", on); $(t.getAttribute("aria-controls")).hidden = !on; });
   store.set("wl.tab", id);
-  if (id === "t-claude") setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 0);
-  else window.scrollTo(0, 0);
+  window.scrollTo(0, 0);
 }
 tabs.forEach(t => t.onclick = () => show(t.id));
-show(store.get("wl.tab", "t-today"));
+show(tabs.some(t => t.id === store.get("wl.tab")) ? store.get("wl.tab") : "t-today");
 
 // ---------- greeting ----------
 const greeting = () => { const h = new Date().getHours(); return h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
@@ -495,47 +459,7 @@ function render() {
   $("syncNote2").textContent = d.lastSync ? `Last synced ${ago(d.lastSync)}` : "Every 15 minutes automatically";
   $("syncBtn").disabled = !connected || syncing;
 
-  // music
-  const m = app?.music || {};
-  if (m.title) { $("songTitle").textContent = m.title; $("songArtist").textContent = [m.artist, m.app].filter(Boolean).join(" · "); }
-  $("playIcon").setAttribute("href", m.playing ? "#i-pause" : "#i-play");
-  $("songToggle").checked = !!app?.songOnWatch;
-  $("accessRow").hidden = !!m.access;
-  $("spotifyBtn").title = m.spotify === false ? "Not installed" : "";
-  $("ytBtn").title = m.ytMusic === false ? "Not installed" : "";
-
-  // Claude
-  $("claudeNote").textContent = app?.hasClaudeKey ? `Saved · answers appear here (${app.claudeModel}) · tap to remove` : "Optional · without it, questions open in the Claude app";
-
-  // accounts, personal touches, sign-in gate
-  const accts = app?.accounts || [];
-  const me = accts[0];
-  const first = app?.userName || me?.givenName || (me?.name || "").split(" ")[0];
-  $("greet").textContent = greeting() + (first ? `, ${first}` : "");
-  if (me?.picture) { $("headAvatar").src = me.picture; $("headAvatar").hidden = false; $("headLogo").hidden = true; }
-  else { $("headAvatar").hidden = true; $("headLogo").hidden = false; }
-  $("acctEmpty").hidden = accts.length > 0;
-  $("backupBtn").hidden = !accts.length;
-  $("acctList").innerHTML = accts.map(a => `<div class="acct">
-      ${a.picture ? `<img class="avatar" src="${esc(a.picture)}" alt="" referrerpolicy="no-referrer">` : `<span class="avatar"></span>`}
-      <div class="grow"><b>${esc(a.name || a.email)}</b><br><span class="small muted">${esc(a.email)}</span><br>
-        <span class="small ${a.backupError ? "" : "muted"}" style="${a.backupError ? "color:var(--heart)" : ""}">${a.backupError ? esc(a.backupError) : a.backupAt ? `Backed up ${ago(a.backupAt)}` : "Not backed up yet"}</span>
-        <button class="link" type="button" data-restore="${esc(a.email)}">Restore from this backup</button></div>
-      <button class="x" type="button" data-remove="${esc(a.email)}" aria-label="Remove ${esc(a.email)}">×</button></div>`).join("");
-  $("acctList").querySelectorAll("[data-remove]").forEach(b => b.onclick = async () => {
-    if (!confirm(`Remove ${b.dataset.remove} from Watch Link? Its Drive backup stays in the account.`)) return;
-    await call("removeGoogleAccount", { email: b.dataset.remove }); refresh(); });
-  $("acctList").querySelectorAll("[data-restore]").forEach(b => b.onclick = async () => {
-    if (!confirm(`Replace the watch data on this phone with the backup from ${b.dataset.restore}?`)) return;
-    await call("restoreBackup", { email: b.dataset.restore }); toast("Restored from Google Drive"); refresh(); });
-  const hc = app?.health || {};
-  $("hcBtn").textContent = !hc.supported ? "Needs Android 14 or newer" : hc.enabled && hc.granted ? "Send to Health Connect now" : "Connect Health Connect";
-  $("hcBtn").disabled = !hc.supported;
-  $("hcNote").textContent = hc.enabled && hc.granted
-    ? (hc.error ? `Last attempt failed: ${hc.error}` : hc.writtenAt ? `Connected · last shared ${ago(hc.writtenAt)}. Open Google Fit and allow it to read from Health Connect.` : "Connected · shares after each sync")
-    : "Share steps, distance, calories, heart rate and sleep with Google Fit and other health apps through Android's Health Connect.";
-
-  if (typeof chat !== "undefined" && !chat.length) renderChat();   // intro text depends on whether a key is saved
+  $("greet").textContent = greeting();
 
   // watch
   $("devState").textContent = connected ? (d.lastSync ? `Connected · synced ${ago(d.lastSync)}` : "Connected") : "Not connected";
@@ -622,99 +546,20 @@ $("cityForm").onsubmit = async e => { e.preventDefault(); const name = $("cityIn
   const place = await call("weatherCity", { name }); $("cityInput").value = ""; toast(`Weather set to ${place}`); refresh(); };
 $("locBtn").onclick = async () => { await call("weatherUseLocation"); toast("Using your location for the weather"); refresh(); };
 
-// Google accounts, backup, Health Connect
-async function addAccount(fromWelcome) {
-  try {
-    const a = await N("addGoogleAccount");
-    toast(`Signed in as ${a.email}`);
-  } catch (e) {
-    const m = e?.message || "Sign-in failed";
-    if (m === "cancelled") return;
-    toast(m);
-  }
-  refresh();
-}
-$("addAcctBtn").onclick = () => addAccount(false);
-$("backupBtn").onclick = async () => { toast("Backing up…"); await call("backupNow"); toast("Backed up to Google Drive"); refresh(); };
-$("hcBtn").onclick = async () => {
-  const hc = app?.health || {};
-  const n = await call(hc.enabled && hc.granted ? "healthSyncNow" : "healthConnect");
-  toast(n ? `Shared ${n} records with Health Connect` : "Health Connect is up to date"); refresh();
-};
-
 // music
 document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => call("music", { op: b.dataset.op }).then(() => setTimeout(refresh, 400)));
 document.querySelectorAll("[data-app]").forEach(b => b.onclick = () => call("openMusicApp", { app: b.dataset.app }));
-$("songToggle").onchange = async e => {
-  await call("songOnWatch", { on: e.target.checked });
-  if (e.target.checked && !app?.music?.access) toast("Allow notification access so the app can see the song");
-  refresh();
-};
-$("accessBtn").onclick = () => call("notificationAccess");
-
-// ---------- Ask Claude ----------
-let chat = store.get("wl.chat", []);
-const SUGGEST = ["How did I sleep this week?", "Am I walking more than last week?", "Is my heart rate normal?", "Give me a goal for tomorrow"];
-function md(text) {   // just enough formatting for chat answers: bold, bullets, line breaks
-  const lines = esc(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split("\n");
-  let html = "", inList = false;
-  for (const l of lines) {
-    const m = l.match(/^\s*[-*•]\s+(.*)/);
-    if (m) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${m[1]}</li>`; continue; }
-    if (inList) { html += "</ul>"; inList = false; }
-    html += l + "\n";
-  }
-  return (inList ? html + "</ul>" : html).trim();
-}
-function renderChat(thinking) {
-  const box = $("chat");
-  if (!chat.length && !thinking) {
-    const via = app?.hasClaudeKey ? "Answers appear right here." : "Your question and your watch data open in the <b>Claude app</b>, so it's covered by your Claude Pro plan. Just tap send there.";
-    box.innerHTML = `<div class="card"><b>Ask Claude about your watch data</b><p class="small muted">Claude sees your steps, heart rate, sleep and battery from the last two weeks. ${via}</p>
-      <div class="chips">${SUGGEST.map(s => `<button class="chip" type="button">${esc(s)}</button>`).join("")}</div></div>`;
-    box.querySelectorAll(".chip").forEach(c => c.onclick = () => ask(c.textContent));
-    return;
-  }
-  box.innerHTML = chat.map(m => `<div class="msg ${m.role}">${m.role === "assistant" ? md(m.text) : esc(m.text)}</div>`).join("")
-    + (thinking ? `<div class="msg assistant typing" aria-label="Claude is thinking"><span></span><span></span><span></span></div>` : "");
-  if (!$("p-claude").hidden) window.scrollTo(0, document.body.scrollHeight);
-}
+// ---------- Ask Claude (opens the Claude app) ----------
+const SUGGEST = ["How did I sleep?", "Am I walking enough?", "Is my heart rate normal?"];
 async function ask(q) {
   q = q.trim(); if (!q) return;
-  if (!app?.hasClaudeKey) {   // free route: open the Claude app with the question + data
-    try {
-      const where = await N("openClaude", { question: q });
-      chat.push({ role: "user", text: q }, { role: "assistant", text: where === "app" ? "Opened in the Claude app with your watch data. Tap send there to get the answer." : "Opened claude.ai with your watch data. Tap send there to get the answer." });
-      store.set("wl.chat", chat); $("askInput").value = ""; renderChat(false);
-    } catch (e) { toast(e?.message || "Couldn't open Claude"); }
-    return;
-  }
-  chat.push({ role: "user", text: q }); store.set("wl.chat", chat); renderChat(true);
-  $("askInput").value = ""; $("askInput").disabled = true;
-  try {
-    const answer = await N("askClaude", { history: chat.slice(-20) });
-    chat.push({ role: "assistant", text: answer });
-  } catch (e) {
-    chat.push({ role: "assistant", text: `Sorry, that didn't work: ${e?.message || "unknown error"}` });
-  }
-  store.set("wl.chat", chat); $("askInput").disabled = false; renderChat(false); $("askInput").focus();
+  try { const where = await N("openClaude", { question: q }); $("askInput").value = "";
+        toast(where === "app" ? "Opened in the Claude app: tap send there" : "Opened claude.ai: tap send there"); }
+  catch (e) { toast(e?.message || "Couldn't open Claude"); }
 }
+$("chips").innerHTML = SUGGEST.map(t => `<button class="chip" type="button">${esc(t)}</button>`).join("");
+$("chips").querySelectorAll(".chip").forEach(c => c.onclick = () => ask(c.textContent));
 $("askForm").onsubmit = e => { e.preventDefault(); ask($("askInput").value); };
-$("clearChatBtn").onclick = () => {
-  if (!chat.length) { toast("The chat is already empty"); return; }
-  if (confirm("Clear all past questions and answers?")) { chat = []; store.set("wl.chat", chat); renderChat(); toast("Chat cleared"); }
-};
-$("keyBtn").onclick = async () => {
-  if (app?.hasClaudeKey) {
-    if (!confirm("Remove the API key? Questions will open in the Claude app instead.")) return;
-    await call("claudeLogout"); toast("Key removed"); return refresh();
-  }
-  const key = (prompt("Paste an Anthropic API key (optional; from console.anthropic.com → API keys)", "") || "").trim();
-  if (!key) return;
-  toast("Checking the key…");
-  await call("claudeLogin", { key, name: "" }); toast("Key saved: answers now appear in Watch Link"); refresh();
-};
-renderChat();
 
 // ---------- start ----------
 if (!N) {
