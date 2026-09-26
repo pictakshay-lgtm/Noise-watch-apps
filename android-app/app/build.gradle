@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.application'
+}
+
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+
+android {
+    namespace 'net.pictakshay.watchlink'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'net.pictakshay.watchlink'
+        minSdk 26
+        targetSdk 34
+        versionCode runNumber
+        versionName "0.1.${runNumber}"
+    }
+
+    // One shared, throwaway signing key kept in the repo, so each new build installs as an
+    // update over the previous one. It is only for sideloading, never for a store listing.
+    signingConfigs {
+        shared {
+            storeFile file('../watchlink-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    buildTypes {
+        debug { signingConfig signingConfigs.shared }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // The Watch Link page and the live faces are copied in from the repo at build time,
+    // so the app always ships the same page as the website.
+    sourceSets {
+        main { assets.srcDirs += ["$buildDir/generated/webassets"] }
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}
+
+def copyWebAssets = tasks.register('copyWebAssets', Copy) {
+    from('../../watch-link') { into 'watch-link' }
+    from('../../watch-faces/live') { include '*.bin'; into 'watch-faces/live' }
+    into "$buildDir/generated/webassets"
+}
+preBuild.dependsOn copyWebAssets
