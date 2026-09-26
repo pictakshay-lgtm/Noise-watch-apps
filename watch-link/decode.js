@@ -45,7 +45,7 @@ export const ESSENTIAL_SERVICES = ["feea", "180a", "180f", "180d"].map(s => `000
 export function errorText(e) {
   if (e == null) return "unknown error";
   if (typeof e === "string") return e;
-  const parts = [e.name, e.message].filter(Boolean);
+  const parts = [e.name !== "Error" && e.name, e.message].filter(Boolean);  // "Error: ..." adds nothing
   if (parts.length) return parts.join(": ");
   const text = String(e);
   if (text !== "[object Object]") return text;
