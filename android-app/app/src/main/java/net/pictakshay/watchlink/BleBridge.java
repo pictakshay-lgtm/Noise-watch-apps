@@ -45,10 +45,9 @@ public class BleBridge {
     private final ExecutorService background = Executors.newSingleThreadExecutor();
     private BleService service;
 
-    /** Methods for the app's own panels (sync, weather, music, Claude); they don't need Bluetooth permission. */
-    private static final List<String> APP_METHODS = Arrays.asList("appData", "music", "openMusicApp", "songOnWatch",
-        "notificationAccess", "claudeKey", "askClaude", "weatherCity", "weatherUseLocation", "setUploading",
-        "openClaude", "claudeLogin", "claudeLogout", "skipClaudeLogin", "addGoogleAccount", "removeGoogleAccount", "backupNow", "restoreBackup", "skipSignIn", "healthConnect", "healthDisconnect", "healthSyncNow");
+    /** Methods for the app's own panels (sync, weather, music, Ask Claude); they don't need Bluetooth permission. */
+    private static final List<String> APP_METHODS = Arrays.asList("appData", "music", "openMusicApp", "openClaude",
+        "weatherCity", "weatherUseLocation", "setUploading");
 
     BleBridge(MainActivity activity, WebView web) {
         this.activity = activity;
@@ -120,24 +119,14 @@ public class BleBridge {
     private void appMethod(String method, JSONObject a, BleService.Result result) throws JSONException {
         WatchSync sync = service.sync();
         switch (method) {
-            case "appData": {
-                JSONObject o = new JSONObject()
+            case "appData":
+                result.ok(new JSONObject()
                     .put("data", sync.data().json())
                     .put("status", sync.status())
                     .put("connected", service.isReady())
-                    .put("songOnWatch", sync.songOnWatch())
-                    .put("music", sync.music().nowPlaying())
-                    .put("hasClaudeKey", !prefs().getString("claudeKey", "").isEmpty())
-                    .put("claudeModel", ClaudeChat.MODEL)
                     .put("weatherPlace", Weather.hasPlace(activity))
-                    .put("weatherCity", prefs().getString("weatherCity", ""))
-                    .put("accounts", GoogleAccounts.describeAccounts(activity))
-                    .put("signInSkipped", prefs().getBoolean("claudeLoginSkipped", false))
-                    .put("userName", prefs().getString("userName", ""))
-                    .put("health", HealthSync.status(activity));
-                result.ok(o);
+                    .put("weatherCity", prefs().getString("weatherCity", "")));
                 break;
-            }
             case "setUploading": sync.setUploading(a.optBoolean("on")); result.ok(null); break;
             case "music": {
                 String op = a.optString("op");
@@ -146,33 +135,31 @@ public class BleBridge {
                 break;
             }
             case "openMusicApp": {
-                String pkg = "spotify".equals(a.optString("app")) ? MusicControl.SPOTIFY : MusicControl.YT_MUSIC;
-                if (sync.music().open(pkg)) result.ok(null);
-                else result.fail("NotFoundError", ("spotify".equals(a.optString("app")) ? "Spotify" : "YouTube Music") + " isn't installed on this phone.");
+                boolean spotify = "spotify".equals(a.optString("app"));
+                if (sync.music().open(spotify ? MusicControl.SPOTIFY : MusicControl.YT_MUSIC)) result.ok(null);
+                else result.fail("NotFoundError", (spotify ? "Spotify" : "YouTube Music") + " isn't installed on this phone.");
                 break;
             }
-            case "songOnWatch": sync.setSongOnWatch(a.optBoolean("on")); result.ok(null); break;
-            case "notificationAccess": sync.music().openNotificationAccessSettings(); result.ok(null); break;
-            case "claudeKey": {
-                String key = a.optString("key").trim();
-                if (!key.isEmpty() && !key.startsWith("sk-ant-")) { result.fail("TypeError", "That doesn't look like an Anthropic API key (they start with sk-ant-)."); break; }
-                prefs().edit().putString("claudeKey", key).apply();
-                result.ok(!key.isEmpty());
-                break;
-            }
-            case "askClaude": {
-                String key = prefs().getString("claudeKey", "");
-                if (key.isEmpty()) { result.fail("SecurityError", "Add your Anthropic API key first."); break; }
-                JSONArray history = a.optJSONArray("history");
-                String digest = sync.data().summary(System.currentTimeMillis());
-                background.execute(() -> {
+            case "openClaude": {
+                // Free with a Claude Pro/Max plan: hand the question plus the watch data to the Claude app
+                // (or claude.ai in the browser).
+                String text = a.optString("question").trim() + "\n\nThis is my data from my Noise Icon 2 smartwatch, synced by the "
+                    + "Watch Link app. Please answer in plain language, and tell me if the data is too sparse.\n\n"
+                    + sync.data().summary(System.currentTimeMillis());
+                android.content.Intent app = new android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text).setPackage("com.anthropic.claude")
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    activity.startActivity(app);
+                    result.ok("app");
+                } catch (android.content.ActivityNotFoundException e) {
+                    String q = text.length() > 6000 ? text.substring(0, 6000) : text;
                     try {
-                        String answer = ClaudeChat.ask(key, history == null ? new JSONArray() : history, digest);
-                        main.post(() -> result.ok(answer));
-                    } catch (RuntimeException e) {
-                        main.post(() -> result.fail("NetworkError", String.valueOf(e.getMessage())));
-                    }
-                });
+                        activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://claude.ai/new?q=" + java.net.URLEncoder.encode(q, "UTF-8"))));
+                        result.ok("web");
+                    } catch (Exception ex) { result.fail("NotFoundError", "Couldn't open Claude: " + ex.getMessage()); }
+                }
                 break;
             }
             case "weatherCity": {
@@ -194,80 +181,6 @@ public class BleBridge {
                     if (!Weather.hasPlace(activity)) { result.fail("NotFoundError", "The phone has no recent location yet. Open Maps once, or type a city."); return; }
                     result.ok(null);
                     if (service.isReady()) service.sync().sendWeather(null);
-                });
-                break;
-            case "openClaude": {
-                // Free with a Claude Pro/Max plan: hand the question plus the watch data to the Claude app
-                // (or claude.ai in the browser) instead of calling the API.
-                String text = a.optString("question").trim() + "\n\nThis is my data from my Noise Icon 2 smartwatch, synced by the "
-                    + "Watch Link app. Please answer in plain language, and tell me if the data is too sparse.\n\n"
-                    + sync.data().summary(System.currentTimeMillis());
-                android.content.Intent app = new android.content.Intent(android.content.Intent.ACTION_SEND)
-                    .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text).setPackage("com.anthropic.claude")
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    activity.startActivity(app);
-                    result.ok("app");
-                } catch (android.content.ActivityNotFoundException e) {
-                    String q = text.length() > 6000 ? text.substring(0, 6000) : text;
-                    try {
-                        activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse("https://claude.ai/new?q=" + java.net.URLEncoder.encode(q, "UTF-8"))));
-                        result.ok("web");
-                    } catch (Exception ex) { result.fail("NotFoundError", "Couldn't open Claude: " + ex.getMessage()); }
-                }
-                break;
-            }
-            case "claudeLogin": {
-                String key = a.optString("key").trim(), name = a.optString("name").trim();
-                if (!key.startsWith("sk-ant-")) { result.fail("TypeError", "Anthropic API keys start with sk-ant-. Copy it from console.anthropic.com → API keys."); break; }
-                background.execute(() -> {
-                    try {
-                        ClaudeChat.validate(key);
-                        android.content.SharedPreferences.Editor ed = prefs().edit().putString("claudeKey", key); if (!name.isEmpty()) ed.putString("userName", name); ed.apply();
-                        main.post(() -> result.ok(name));
-                    } catch (RuntimeException e) {
-                        main.post(() -> result.fail("SecurityError", String.valueOf(e.getMessage())));
-                    }
-                });
-                break;
-            }
-            case "claudeLogout": prefs().edit().remove("claudeKey").putBoolean("claudeLoginSkipped", false).apply(); result.ok(null); break;
-            case "skipClaudeLogin": {
-                String name = a.optString("name").trim();
-                android.content.SharedPreferences.Editor e = prefs().edit().putBoolean("claudeLoginSkipped", true);
-                if (!name.isEmpty()) e.putString("userName", name);
-                e.apply();
-                result.ok(null);
-                break;
-            }
-            case "addGoogleAccount":
-                GoogleAccounts.add(activity, (err, acct) -> { if (err != null) result.fail("NetworkError", err); else result.ok(acct); });
-                break;
-            case "removeGoogleAccount": GoogleAccounts.remove(activity, a.optString("email")); result.ok(null); break;
-            case "skipSignIn": GoogleAccounts.skipSignIn(activity); result.ok(null); break;
-            case "backupNow":
-                GoogleAccounts.backupAll(activity, true, (err, r) -> { if (err != null) result.fail("NetworkError", err); else result.ok(null); });
-                break;
-            case "restoreBackup":
-                GoogleAccounts.restore(activity, a.optString("email"), sync.data(), (err, r) -> { if (err != null) result.fail("NetworkError", err); else result.ok(null); });
-                break;
-            case "healthConnect":
-                if (!HealthSync.supported()) { result.fail("NotSupportedError", "Health Connect needs Android 14 or newer."); break; }
-                activity.requestHealth(granted -> {
-                    if (!granted) { result.fail("SecurityError", "Health Connect access wasn't allowed. You can allow it in Settings > Health Connect."); return; }
-                    HealthSync.setEnabled(activity, true);
-                    HealthSync.write(activity, sync.data().json(), activity.getMainExecutor(), (err, n) -> {
-                        HealthSync.recordError(activity, err);
-                        if (err != null) result.fail("NetworkError", err); else result.ok(n);
-                    });
-                });
-                break;
-            case "healthDisconnect": HealthSync.setEnabled(activity, false); result.ok(null); break;
-            case "healthSyncNow":
-                HealthSync.write(activity, sync.data().json(), activity.getMainExecutor(), (err, n) -> {
-                    HealthSync.recordError(activity, err);
-                    if (err != null) result.fail("NetworkError", err); else result.ok(n);
                 });
                 break;
             default: result.fail("NotSupportedError", "Unknown method " + method);
