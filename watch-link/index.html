@@ -164,11 +164,11 @@ li{margin:3px 0}
 <script>
 window.addEventListener("error", e => { if (!(e instanceof ErrorEvent) && !(e.target && e.target.tagName === "SCRIPT")) return; const s = document.getElementById("support"); s.textContent = "Page error: " + (e.message || "script failed to load") + ". Send a screenshot of this to Claude."; s.hidden = false; }, true);
 window.addEventListener("unhandledrejection", e => { const s = document.getElementById("support"); s.textContent = "Page error: " + ((e.reason && e.reason.message) || e.reason) + ". Send a screenshot of this to Claude."; s.hidden = false; });
-setTimeout(() => { if (!window.watchLinkReady) { const s = document.getElementById("support"); s.textContent = "The page's main script didn't load, so the buttons won't work. Reload the page; if this stays, send a screenshot to Claude."; s.hidden = false; } }, 4000);
+setTimeout(() => { if (!window.watchLinkReady) { const s = document.getElementById("support"); s.textContent = "The page\'s main script didn\'t load, so the buttons won\'t work. This usually means an old copy is cached: close this tab and open the page again (or wait 10 minutes and reload). If it stays, send a screenshot to Claude."; s.hidden = false; } }, 4000);
 </script>
 <script type="module">
-import { FaceUploader, looksLikeFaceFile } from "./upload.js";
-import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js";
+import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261613"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
+import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261613";
 
 const $ = id => document.getElementById(id);
 const HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
