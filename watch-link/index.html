@@ -168,7 +168,7 @@ setTimeout(() => { if (!window.watchLinkReady) { const s = document.getElementBy
 </script>
 <script type="module">
 import { FaceUploader, looksLikeFaceFile } from "./upload.js";
-import { CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js";
+import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js";
 
 const $ = id => document.getElementById(id);
 const HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
@@ -230,7 +230,7 @@ async function readChar(ch, out) {
     out.textContent = desc != null ? `${desc}  (${toHex(bytes)})` : toHex(bytes) || "(empty)";
     log("read", ch.uuid, bytes, desc || "");
     if (INFO[ch.uuid] && desc) { deviceInfo[INFO[ch.uuid]] = desc; renderDevice(); }
-  } catch (e) { out.textContent = `Couldn't read: ${e.message}`; log("error", ch.uuid, null, e.message); }
+  } catch (e) { out.textContent = `Couldn't read: ${errorText(e)}`; log("error", ch.uuid, null, errorText(e)); }
 }
 
 async function listen(ch, out, btn) {
@@ -244,12 +244,12 @@ async function listen(ch, out, btn) {
     await ch.startNotifications();
     btn.disabled = true; btn.textContent = "Listening";
     log("info", ch.uuid, null, "listening");
-  } catch (e) { out.textContent = `Couldn't listen: ${e.message}`; log("error", ch.uuid, null, e.message); }
+  } catch (e) { out.textContent = `Couldn't listen: ${errorText(e)}`; log("error", ch.uuid, null, errorText(e)); }
 }
 
 async function explore(server) {
   let services = [];
-  try { services = await server.getPrimaryServices(); } catch (e) { log("error", "", null, "No services opened: " + e.message); }
+  try { services = await server.getPrimaryServices(); } catch (e) { log("error", "", null, "No services opened: " + errorText(e)); }
   if (!services.some(s => s.uuid === MOYOUNG)) {
     deviceInfo.Note = "No Noise/MOYOUNG service (feea) found. This may not be your watch; disconnect and try again.";
   }
@@ -263,7 +263,7 @@ async function explore(server) {
     det.innerHTML = `<summary>${esc(STD_SERVICES[svc.uuid] || "Vendor service")} <span class="props">${esc(shortId(svc.uuid))}</span></summary>`;
     box.appendChild(det);
     let chars = [];
-    try { chars = await svc.getCharacteristics(); } catch (e) { det.insertAdjacentHTML("beforeend", `<p class="muted">Couldn't list: ${esc(e.message)}</p>`); continue; }
+    try { chars = await svc.getCharacteristics(); } catch (e) { det.insertAdjacentHTML("beforeend", `<p class="muted">Couldn't list: ${esc(errorText(e))}</p>`); continue; }
     for (const ch of chars) {
       const p = ch.properties;
       const props = ["read", "write", "writeWithoutResponse", "notify", "indicate"].filter(k => p[k]).join(" · ");
@@ -295,15 +295,26 @@ async function connect(showAll) {
   if (!navigator.bluetooth) { showProblem(noBluetoothMessage()); return; }
   const optionalServices = optionalServiceList();
   if (!optionalServices) return;
+  const request = opts => navigator.bluetooth.requestDevice(showAll
+    ? { acceptAllDevices: true, optionalServices: opts }
+    : { filters: [{ services: [MOYOUNG] }, { namePrefix: "Noise" }], optionalServices: opts });
+  // NotFoundError also means the user closed the chooser, so it isn't reported as a problem.
+  const cancelled = e => e && e.name === "NotFoundError";
   let picked;
   try {
-    picked = await navigator.bluetooth.requestDevice(showAll
-      ? { acceptAllDevices: true, optionalServices }
-      : { filters: [{ services: [MOYOUNG] }, { namePrefix: "Noise" }], optionalServices });
+    picked = await request(optionalServices);
   } catch (e) {
-    // NotFoundError also means the user closed the chooser, so only report other errors.
-    if (e.name !== "NotFoundError") { log("error", "", null, e.message); showProblem(`Couldn't open the device list: ${e.message}`); }
-    return;
+    if (cancelled(e)) return;
+    log("error", "", null, `device list failed: ${errorText(e)}; retrying with fewer services`);
+    // Some browsers (e.g. Bluefy) reject long or unusual service lists, so retry with just the essentials.
+    try {
+      picked = await request(ESSENTIAL_SERVICES);
+    } catch (e2) {
+      if (cancelled(e2)) return;
+      log("error", "", null, `device list failed again: ${errorText(e2)}`);
+      showProblem(`Couldn't open the device list: ${errorText(e2)}. Try <b>Show all devices</b> instead.`);
+      return;
+    }
   }
   await openDevice(picked);
 }
@@ -317,7 +328,7 @@ async function reconnectSaved() {
     return;
   }
   let saved = [];
-  try { saved = await navigator.bluetooth.getDevices(); } catch (e) { showProblem(`Couldn't read saved devices: ${e.message}`); return; }
+  try { saved = await navigator.bluetooth.getDevices(); } catch (e) { showProblem(`Couldn't read saved devices: ${errorText(e)}`); return; }
   if (!saved.length) {
     showProblem("No saved watch yet. Free the watch once (disconnect it in phone Bluetooth settings and close NoiseFit), pick it with <b>Connect to watch</b>, and after that <b>Reconnect saved watch</b> works even while NoiseFit is connected.");
     return;
@@ -345,8 +356,8 @@ async function openDevice(d, fromSaved) {
     await explore(server);
   } catch (e) {
     $("connState").textContent = "Couldn't connect"; setBusy(false);
-    log("error", "", null, e.message + " (Is NoiseFit still connected to the watch?)");
-    if (fromSaved) showProblem(`Couldn't reach the saved watch: ${e.message}. Make sure it's nearby and awake. If it keeps failing, NoiseFit may be holding the only connection. Close NoiseFit and try again.`);
+    log("error", "", null, errorText(e) + " (Is NoiseFit still connected to the watch?)");
+    if (fromSaved) showProblem(`Couldn't reach the saved watch: ${errorText(e)}. Make sure it's nearby and awake. If it keeps failing, NoiseFit may be holding the only connection. Close NoiseFit and try again.`);
   }
 }
 
@@ -373,7 +384,7 @@ document.querySelectorAll("[data-face]").forEach(b => b.onclick = async () => {
     const res = await fetch(`../watch-faces/live/${b.dataset.face}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     chooseFace(new Uint8Array(await res.arrayBuffer()), b.dataset.face);
-  } catch (e) { $("faceChosen").textContent = `Couldn't load ${b.dataset.face}: ${e.message}`; }
+  } catch (e) { $("faceChosen").textContent = `Couldn't load ${b.dataset.face}: ${errorText(e)}`; }
 });
 $("faceInput").onchange = async e => {
   const f = e.target.files[0];
@@ -416,8 +427,8 @@ async function uploadFace() {
     log("info", FEE(3), null, `face upload finished, watch checksum ${checksum.toString(16)}`);
     msg(`Done. The watch received ${faceName} (checksum ${checksum.toString(16)}) and should now show it. If it doesn't, pick the gallery / custom face on the watch.`);
   } catch (e) {
-    log("error", FEE(3), null, `face upload failed: ${e.message}`);
-    msg(`Upload failed: ${e.message}${/length|size|GATT/i.test(e.message) ? " This phone's Bluetooth may not allow the 244-byte packets these watches use; try the dawfu tool on a laptop instead." : ""}`);
+    log("error", FEE(3), null, `face upload failed: ${errorText(e)}`);
+    msg(`Upload failed: ${errorText(e)}${/length|size|GATT/i.test(errorText(e)) ? " This phone's Bluetooth may not allow the 244-byte packets these watches use; try the dawfu tool on a laptop instead." : ""}`);
   } finally {
     if (notify && onNotify) notify.removeEventListener("characteristicvaluechanged", onNotify);
     uploading = false; refreshUpload(); setBusy(!!device?.gatt?.connected);
