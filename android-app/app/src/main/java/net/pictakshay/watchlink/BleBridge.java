@@ -48,7 +48,7 @@ public class BleBridge {
     /** Methods for the app's own panels (sync, weather, music, Claude); they don't need Bluetooth permission. */
     private static final List<String> APP_METHODS = Arrays.asList("appData", "music", "openMusicApp", "songOnWatch",
         "notificationAccess", "claudeKey", "askClaude", "weatherCity", "weatherUseLocation", "setUploading",
-        "claudeLogin", "claudeLogout", "skipClaudeLogin", "addGoogleAccount", "removeGoogleAccount", "backupNow", "restoreBackup", "skipSignIn", "healthConnect", "healthDisconnect", "healthSyncNow");
+        "openClaude", "claudeLogin", "claudeLogout", "skipClaudeLogin", "addGoogleAccount", "removeGoogleAccount", "backupNow", "restoreBackup", "skipSignIn", "healthConnect", "healthDisconnect", "healthSyncNow");
 
     BleBridge(MainActivity activity, WebView web) {
         this.activity = activity;
@@ -196,13 +196,35 @@ public class BleBridge {
                     if (service.isReady()) service.sync().sendWeather(null);
                 });
                 break;
+            case "openClaude": {
+                // Free with a Claude Pro/Max plan: hand the question plus the watch data to the Claude app
+                // (or claude.ai in the browser) instead of calling the API.
+                String text = a.optString("question").trim() + "\n\nThis is my data from my Noise Icon 2 smartwatch, synced by the "
+                    + "Watch Link app. Please answer in plain language, and tell me if the data is too sparse.\n\n"
+                    + sync.data().summary(System.currentTimeMillis());
+                android.content.Intent app = new android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text).setPackage("com.anthropic.claude")
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    activity.startActivity(app);
+                    result.ok("app");
+                } catch (android.content.ActivityNotFoundException e) {
+                    String q = text.length() > 6000 ? text.substring(0, 6000) : text;
+                    try {
+                        activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://claude.ai/new?q=" + java.net.URLEncoder.encode(q, "UTF-8"))));
+                        result.ok("web");
+                    } catch (Exception ex) { result.fail("NotFoundError", "Couldn't open Claude: " + ex.getMessage()); }
+                }
+                break;
+            }
             case "claudeLogin": {
                 String key = a.optString("key").trim(), name = a.optString("name").trim();
                 if (!key.startsWith("sk-ant-")) { result.fail("TypeError", "Anthropic API keys start with sk-ant-. Copy it from console.anthropic.com → API keys."); break; }
                 background.execute(() -> {
                     try {
                         ClaudeChat.validate(key);
-                        prefs().edit().putString("claudeKey", key).putString("userName", name).apply();
+                        android.content.SharedPreferences.Editor ed = prefs().edit().putString("claudeKey", key); if (!name.isEmpty()) ed.putString("userName", name); ed.apply();
                         main.post(() -> result.ok(name));
                     } catch (RuntimeException e) {
                         main.post(() -> result.fail("SecurityError", String.valueOf(e.getMessage())));
