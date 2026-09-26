@@ -133,10 +133,11 @@ li{margin:3px 0}
 
   <section class="panel" aria-labelledby="upH">
     <div class="head"><h2 id="upH">Upload watch face</h2><span class="eyebrow">experimental</span></div>
-    <p class="muted" style="font-size:13px">Sends a MoYoung-format face file to the watch over Bluetooth, the same way the <i>dawfu</i> tool does. Connect to the watch first, keep it charged above 50%, and keep this page open until it finishes (about 1–3 minutes). If the watch rejects the face or it looks wrong, pick another face in NoiseFit.</p>
+    <p class="muted" style="font-size:13px">Sends a MoYoung-format face file to the watch over Bluetooth, the same way the <i>dawfu</i> tool does. Connect to the watch first, keep it charged above 50%, and keep this page open until it finishes (about 1–3 minutes). Try <b>Tiny test</b> first: it's 16 chunks instead of 1,300, so it shows within seconds whether the watch accepts uploads at all. If the watch rejects the face or it looks wrong, pick another face in NoiseFit.</p>
     <div class="btns">
       <button type="button" class="small" data-face="onedark_live.bin">One Dark Live</button>
       <button type="button" class="small" data-face="web_live.bin">Web Live</button>
+      <button type="button" class="small" data-face="tiny_test.bin" title="4 KB test face: blue, green and red blocks, no clock. Uploads in seconds.">Tiny test (4 KB)</button>
       <label class="small" style="display:inline-flex;align-items:center;gap:6px">or a .bin file <input type="file" id="faceInput" accept=".bin,application/octet-stream" style="width:auto;padding:4px"></label>
     </div>
     <p class="muted" style="font-size:13px" id="faceChosen">No face chosen.</p>
@@ -174,8 +175,8 @@ window.addEventListener("unhandledrejection", e => { const s = document.getEleme
 setTimeout(() => { if (!window.watchLinkReady) { const s = document.getElementById("support"); s.textContent = "The page\'s main script didn\'t load, so the buttons won\'t work. This usually means an old copy is cached: close this tab and open the page again (or wait 10 minutes and reload). If it stays, send a screenshot to Claude."; s.hidden = false; } }, 4000);
 </script>
 <script type="module">
-import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261730"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
-import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261730";
+import { FaceUploader, looksLikeFaceFile } from "./upload.js?v=202609261900"; // bump v= whenever a module changes, so the page never pairs with a stale cached copy
+import { ESSENTIAL_SERVICES, errorText, CANDIDATE_SERVICES, STD_SERVICES, STD_CHARS, shortId, normalizeUuid, toHex, parseHeartRate, describeValue, restingEstimate } from "./decode.js?v=202609261900";
 
 const $ = id => document.getElementById(id);
 const HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb";
@@ -486,7 +487,7 @@ async function uploadFace() {
   if (maker && maker !== "MOYOUNG-V2") { msg(`The watch reports "${maker}", not MOYOUNG-V2, so this face format may not fit it. Upload stopped.`); return; }
   if (!confirm(`Upload ${faceName} to ${device.name || "the watch"}?${maker ? "" : "\n\nThe watch didn't report its platform, so compatibility can't be checked."}\n\nKeep this page open until it finishes.`)) return;
 
-  let notify, onNotify;
+  let notify, onNotify, heard = 0;
   uploading = true; refreshUpload(); setBusy(true);
   $("uploadProgress").hidden = false; $("uploadProgress").value = 0;
   msg("Starting upload…");
@@ -494,25 +495,39 @@ async function uploadFace() {
     const [send, sendFile] = [await svc.getCharacteristic(FEE(2)), await svc.getCharacteristic(FEE(6))];
     notify = await svc.getCharacteristic(FEE(3));
     const write = c => b => (c.writeValueWithoutResponse ? c.writeValueWithoutResponse(b) : c.writeValue(b));
-    const packetSize = Number($("packetSize").value) || 244;
+    let packetSize = Number($("packetSize").value) || 244;
+    if (window.watchLinkMtu) {   // Android app: a write longer than the link's MTU would be cut short
+      const mtu = await window.watchLinkMtu().catch(() => 0);
+      log("info", FEE(6), null, `Bluetooth MTU ${mtu || "unknown"}${mtu ? ` (fits ${mtu - 3} bytes per write)` : ""}`);
+      if (mtu && mtu - 3 < packetSize) packetSize = Math.max(20, mtu - 3);
+    }
     const up = new FaceUploader(faceFile, {
       send: write(send), sendFile: write(sendFile), packetSize,
-      onEvent: text => log("info", FEE(3), null, text),
+      onEvent: text => { log("info", FEE(3), null, text); msg(text[0].toUpperCase() + text.slice(1) + "…"); },
       onProgress: p => { $("uploadProgress").value = Math.round(p * 100); msg(`Uploading… ${Math.round(p * 100)}%`); },
     });
-    onNotify = ev => up.handle(bytesOf(ev.target.value));
+    onNotify = ev => {
+      const bytes = bytesOf(ev.target.value);
+      if (heard++ < 12) log("notify", FEE(3), bytes, "from watch during upload");   // shows what the watch actually answers
+      up.handle(bytes);
+    };
     notify.addEventListener("characteristicvaluechanged", onNotify);
     await notify.startNotifications();
     log("info", FEE(3), null, `face upload started: ${faceName}, ${faceFile.length} bytes, packets of ${packetSize}`);
     const checksum = await up.start();
-    log("info", FEE(3), null, `face upload finished, watch checksum ${checksum.toString(16)}`);
-    msg(`Done. The watch received ${faceName} (checksum ${checksum.toString(16)}) and should now show it. If it doesn't, pick the gallery / custom face on the watch.`);
+    if (checksum == null) {
+      log("info", FEE(3), null, `face pushed without confirmation (${heard} replies from the watch)`);
+      msg(`Sent ${faceName}, but the watch never confirmed it (${heard} replies). Look at the watch: if the face didn't change, it doesn't accept uploads this way. The event log below shows what it answered.`);
+    } else {
+      log("info", FEE(3), null, `face upload finished, watch checksum ${checksum.toString(16)}`);
+      msg(`Done. The watch received ${faceName} (checksum ${checksum.toString(16)}) and should now show it. If it doesn't, pick the gallery / custom face on the watch.`);
+    }
   } catch (e) {
     log("error", FEE(3), null, `face upload failed: ${errorText(e)}`);
     const hint = /stopped responding/.test(errorText(e)) && $("packetSize").value === "244"
       ? " If this is an iPad or iPhone, set Packet size to 180 and try again."
       : /length|size|GATT/i.test(errorText(e)) ? " Try a smaller Packet size, or the dawfu tool on a laptop." : "";
-    msg(`Upload failed: ${errorText(e)}${hint}`);
+    msg(`Upload failed: ${errorText(e)}${hint} The watch replied ${heard} time(s); see the event log below.`);
   } finally {
     if (notify && onNotify) notify.removeEventListener("characteristicvaluechanged", onNotify);
     uploading = false; refreshUpload(); setBusy(!!device?.gatt?.connected);

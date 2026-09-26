@@ -76,6 +76,7 @@ public class BleService extends Service {
     private boolean userDisconnected;
     private int retries;
     private Op current;
+    private int mtu = 23;   // negotiated on connect; a write can carry mtu - 3 bytes
 
     // ---------- lifecycle ----------
 
@@ -190,9 +191,17 @@ public class BleService extends Service {
         });
     }
 
+    int mtu() { return mtu; }
+
     void write(String service, String characteristic, byte[] value, boolean withResponse, Result result) {
         BluetoothGattCharacteristic c = find(service, characteristic, result);
         if (c == null) return;
+        if (value.length > mtu - 3) {
+            // Android would silently cut the write short, which the watch sees as a corrupt chunk.
+            result.fail("NetworkError", "The Bluetooth link only fits " + (mtu - 3) + " bytes per write (MTU " + mtu + "), but "
+                + value.length + " were sent. Choose a smaller Packet size.");
+            return;
+        }
         int type = withResponse ? BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT : BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE;
         enqueue(new Op(result) {
             @Override boolean start() {
@@ -233,6 +242,7 @@ public class BleService extends Service {
                 if (g != gatt) return;
                 if (state == BluetoothProfile.STATE_CONNECTED) {
                     retries = 0;
+                    mtu = 23;
                     // Ask for a large MTU so 244-byte watch face chunks fit in one write.
                     if (!g.requestMtu(517)) g.discoverServices();
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
@@ -247,8 +257,12 @@ public class BleService extends Service {
             });
         }
 
-        @Override public void onMtuChanged(BluetoothGatt g, int mtu, int status) {
-            main.post(() -> { if (g == gatt) g.discoverServices(); });
+        @Override public void onMtuChanged(BluetoothGatt g, int newMtu, int status) {
+            main.post(() -> {
+                if (g != gatt) return;
+                if (status == BluetoothGatt.GATT_SUCCESS) mtu = newMtu;
+                g.discoverServices();
+            });
         }
 
         @Override public void onServicesDiscovered(BluetoothGatt g, int status) {
