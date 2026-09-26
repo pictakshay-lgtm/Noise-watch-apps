@@ -19,9 +19,11 @@ While the watch is connected, the app syncs by itself, even when the app is clos
 
 Data is stored on the phone in `watchdata.json` (about a month of readings). The watch commands come from the MoYoung / Da Fit protocol as reverse-engineered by Gadgetbridge (see `WatchProtocol.java`).
 
-## Signing in
+## No login
 
-The welcome screen signs you in **with Claude**: your first name and an Anthropic API key (from console.anthropic.com → API keys). The key is checked with a free call (listing models), stored only on the phone, and powers Ask Claude; the name personalises the app. *Skip for now* works too; sign in later from *Watch → Claude account*.
+The app opens straight to *Today*; there's no account or sign-in.
+
+**Ask Claude** hands your question plus a summary of your watch data to the **Claude app** (or claude.ai in the browser), so it's covered by a Claude Pro/Max plan at no extra cost. Optionally, an Anthropic API key (*Watch → Claude API key*) makes answers appear inside Watch Link instead.
 
 ## Google accounts, Drive backup and Google Fit (optional)
 

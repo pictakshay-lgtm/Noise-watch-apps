@@ -191,19 +191,6 @@
            opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 10; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
   .banner { display: flex; gap: 12px; align-items: flex-start; background: var(--accent-soft); border-radius: 16px; padding: 14px; margin-bottom: 14px; font-size: 14px; }
-  /* welcome / sign-in gate */
-  .welcome { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: flex; flex-direction: column;
-             padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); overflow-y: auto; }
-  .welcome .in { max-width: 420px; margin: auto; width: 100%; text-align: center; }   /* centred when it fits, scrolls from the top when it doesn't */
-  .welcome img.mark { width: 80px; height: 80px; border-radius: 22px; box-shadow: 0 12px 32px rgba(14, 31, 58, .35); }
-  .welcome h1 { font-size: 26px; letter-spacing: -.02em; margin: 18px 0 6px; }
-  .welcome .lead { color: var(--text-2); margin: 0 0 20px; }
-  .perks { text-align: left; display: grid; gap: 10px; margin: 0 0 24px; padding: 0; list-style: none; }
-  .perks li { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
-  .perks svg { width: 22px; height: 22px; color: var(--accent); flex: none; }
-  .gbtn { width: 100%; min-height: 54px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow);
-          display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 700; font-size: 16px; }
-  .gbtn svg { width: 22px; height: 22px; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--surface-2); flex: none; }
   .acct { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
   .acct:first-child { border-top: 0; }
@@ -241,29 +228,6 @@
     <symbol id="i-send" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.5-7.5a1 1 0 0 0 0-1.8L3.4 3.6a1 1 0 0 0-1.4 1.1L4 11l8 1-8 1-2 6.3a1 1 0 0 0 1.4 1.1z"/></symbol>
   </defs>
 </svg>
-
-<div class="welcome" id="welcome" hidden>
-  <div class="in">
-    <img class="mark" src="logo.svg" alt="">
-    <h1>Welcome to Watch Link</h1>
-    <p class="lead">Your Noise watch, synced every 15 minutes, with Claude to explain it.</p>
-    <ul class="perks">
-      <li><svg><use href="#i-spark"/></svg><span><b>Ask Claude about your health</b><br><span class="small muted">"How did I sleep?" answered from your own data</span></span></li>
-      <li><svg><use href="#i-sync"/></svg><span><b>Always in sync</b><br><span class="small muted">Steps, heart rate, sleep and weather, every 15 minutes</span></span></li>
-      <li><svg><use href="#i-fit"/></svg><span><b>Works with Google Fit</b><br><span class="small muted">Through Health Connect on Android 14+</span></span></li>
-    </ul>
-    <form id="loginForm" style="display:grid;gap:10px;text-align:left">
-      <label class="small muted" for="loginName">Your first name</label>
-      <input class="field" id="loginName" autocomplete="given-name" placeholder="e.g. Akshay" required>
-      <label class="small muted" for="loginKey">Anthropic API key</label>
-      <input class="field" id="loginKey" type="password" autocomplete="off" placeholder="sk-ant-…" required>
-      <p class="small" id="welcomeMsg" role="alert" style="margin:0;color:var(--heart)" hidden></p>
-      <button class="btn primary block" id="loginBtn" type="submit" style="margin-top:6px"><svg class="icon"><use href="#i-spark"/></svg>Sign in with Claude</button>
-    </form>
-    <p class="small muted" style="margin:12px 0 0">Get a key at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a> → API keys. It's checked for free, stays on this phone, and questions are billed to your Anthropic account.</p>
-    <button class="link" id="skipBtn" type="button">Skip for now</button>
-  </div>
-</div>
 
 <div class="wrap">
   <header class="top">
@@ -381,17 +345,7 @@
 
   <!-- ================= ASK CLAUDE ================= -->
   <section role="tabpanel" id="p-claude" aria-labelledby="t-claude" hidden>
-    <div id="keySetup" class="card" hidden>
-      <h2>Ask Claude about your health</h2>
-      <p style="margin-top:0">Ask things like <i>"How did I sleep this week?"</i> Claude reads the data synced from your watch and answers in plain language.</p>
-      <p class="small muted">It needs your own Anthropic API key (usage is billed to your account). The key stays on this phone.
-        Get one at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a>.</p>
-      <form id="keyForm" class="row" style="margin-top:12px">
-        <input class="field" id="keyInput" type="password" autocomplete="off" placeholder="sk-ant-…" aria-label="Anthropic API key">
-        <button class="btn primary" type="submit">Save</button>
-      </form>
-    </div>
-    <div id="chatArea" hidden>
+    <div id="chatArea">
       <div class="chat" id="chat" aria-live="polite"></div>
       <div class="composer" id="composer">
         <form id="askForm">
@@ -450,7 +404,7 @@
     <div class="card list">
       <a class="item" href="../#upH"><span class="ic"><svg><use href="#i-face"/></svg></span><span class="grow"><b>Watch faces</b><br><span class="small muted">Upload a custom face (experimental)</span></span><svg class="chev"><use href="#i-chev"/></svg></a>
       <a class="item" href="../"><span class="ic"><svg><use href="#i-tools"/></svg></span><span class="grow"><b>Advanced</b><br><span class="small muted">Live Bluetooth data, event log, raw services</span></span><svg class="chev"><use href="#i-chev"/></svg></a>
-      <button class="item" id="keyBtn" type="button"><span class="ic"><svg><use href="#i-spark"/></svg></span><span class="grow"><b>Claude account</b><br><span class="small muted" id="claudeNote">Add your key to use Ask Claude</span></span></button>
+      <button class="item" id="keyBtn" type="button"><span class="ic"><svg><use href="#i-spark"/></svg></span><span class="grow"><b>Claude API key</b><br><span class="small muted" id="claudeNote">Add your key to use Ask Claude</span></span></button>
       <button class="item" id="clearChatBtn" type="button"><span class="ic"><svg><use href="#i-trash"/></svg></span><span class="grow"><b>Clear chat history</b><br><span class="small muted">Removes past questions from this phone</span></span></button>
       <button class="item" id="disconnectBtn" type="button"><span class="ic"><svg style="color:var(--heart)"><use href="#i-off"/></svg></span><span class="grow"><b style="color:var(--heart)">Disconnect</b><br><span class="small muted">Stops syncing until you connect again</span></span></button>
     </div>
@@ -551,9 +505,7 @@ function render() {
   $("ytBtn").title = m.ytMusic === false ? "Not installed" : "";
 
   // Claude
-  $("keySetup").hidden = !!app?.hasClaudeKey;
-  $("chatArea").hidden = !app?.hasClaudeKey;
-  $("claudeNote").textContent = app?.hasClaudeKey ? `Signed in with Claude · using ${app.claudeModel} · tap to sign out` : "Not signed in · tap to sign in";
+  $("claudeNote").textContent = app?.hasClaudeKey ? `Saved · answers appear here (${app.claudeModel}) · tap to remove` : "Optional · without it, questions open in the Claude app";
 
   // accounts, personal touches, sign-in gate
   const accts = app?.accounts || [];
@@ -562,7 +514,6 @@ function render() {
   $("greet").textContent = greeting() + (first ? `, ${first}` : "");
   if (me?.picture) { $("headAvatar").src = me.picture; $("headAvatar").hidden = false; $("headLogo").hidden = true; }
   else { $("headAvatar").hidden = true; $("headLogo").hidden = false; }
-  $("welcome").hidden = !(N && app && !app.hasClaudeKey && !app.signInSkipped);
   $("acctEmpty").hidden = accts.length > 0;
   $("backupBtn").hidden = !accts.length;
   $("acctList").innerHTML = accts.map(a => `<div class="acct">
@@ -583,6 +534,8 @@ function render() {
   $("hcNote").textContent = hc.enabled && hc.granted
     ? (hc.error ? `Last attempt failed: ${hc.error}` : hc.writtenAt ? `Connected · last shared ${ago(hc.writtenAt)}. Open Google Fit and allow it to read from Health Connect.` : "Connected · shares after each sync")
     : "Share steps, distance, calories, heart rate and sleep with Google Fit and other health apps through Android's Health Connect.";
+
+  if (typeof chat !== "undefined" && !chat.length) renderChat();   // intro text depends on whether a key is saved
 
   // watch
   $("devState").textContent = connected ? (d.lastSync ? `Connected · synced ${ago(d.lastSync)}` : "Connected") : "Not connected";
@@ -677,23 +630,11 @@ async function addAccount(fromWelcome) {
   } catch (e) {
     const m = e?.message || "Sign-in failed";
     if (m === "cancelled") return;
-    if (fromWelcome) { $("welcomeMsg").textContent = m; $("skipBtn").hidden = false; } else toast(m);
+    toast(m);
   }
   refresh();
 }
 $("addAcctBtn").onclick = () => addAccount(false);
-$("loginForm").onsubmit = async e => {
-  e.preventDefault();
-  const name = $("loginName").value.trim(), key = $("loginKey").value.trim();
-  $("welcomeMsg").hidden = true; $("loginBtn").disabled = true; $("loginBtn").lastChild.textContent = "Checking your key…";
-  try {
-    await N("claudeLogin", { name, key });
-    $("loginKey").value = ""; toast(name ? `Welcome, ${name}!` : "Signed in with Claude");
-  } catch (err) { $("welcomeMsg").textContent = err?.message || "Sign-in failed"; $("welcomeMsg").hidden = false; }
-  $("loginBtn").disabled = false; $("loginBtn").lastChild.textContent = "Sign in with Claude";
-  refresh();
-};
-$("skipBtn").onclick = async () => { await call("skipClaudeLogin", { name: $("loginName").value.trim() }); refresh(); };
 $("backupBtn").onclick = async () => { toast("Backing up…"); await call("backupNow"); toast("Backed up to Google Drive"); refresh(); };
 $("hcBtn").onclick = async () => {
   const hc = app?.health || {};
@@ -728,7 +669,8 @@ function md(text) {   // just enough formatting for chat answers: bold, bullets,
 function renderChat(thinking) {
   const box = $("chat");
   if (!chat.length && !thinking) {
-    box.innerHTML = `<div class="card"><b>Hi! Ask me about your watch data.</b><p class="small muted">I can see your steps, heart rate, sleep and battery from the last few weeks.</p>
+    const via = app?.hasClaudeKey ? "Answers appear right here." : "Your question and your watch data open in the <b>Claude app</b>, so it's covered by your Claude Pro plan. Just tap send there.";
+    box.innerHTML = `<div class="card"><b>Ask Claude about your watch data</b><p class="small muted">Claude sees your steps, heart rate, sleep and battery from the last two weeks. ${via}</p>
       <div class="chips">${SUGGEST.map(s => `<button class="chip" type="button">${esc(s)}</button>`).join("")}</div></div>`;
     box.querySelectorAll(".chip").forEach(c => c.onclick = () => ask(c.textContent));
     return;
@@ -739,6 +681,14 @@ function renderChat(thinking) {
 }
 async function ask(q) {
   q = q.trim(); if (!q) return;
+  if (!app?.hasClaudeKey) {   // free route: open the Claude app with the question + data
+    try {
+      const where = await N("openClaude", { question: q });
+      chat.push({ role: "user", text: q }, { role: "assistant", text: where === "app" ? "Opened in the Claude app with your watch data. Tap send there to get the answer." : "Opened claude.ai with your watch data. Tap send there to get the answer." });
+      store.set("wl.chat", chat); $("askInput").value = ""; renderChat(false);
+    } catch (e) { toast(e?.message || "Couldn't open Claude"); }
+    return;
+  }
   chat.push({ role: "user", text: q }); store.set("wl.chat", chat); renderChat(true);
   $("askInput").value = ""; $("askInput").disabled = true;
   try {
@@ -750,14 +700,19 @@ async function ask(q) {
   store.set("wl.chat", chat); $("askInput").disabled = false; renderChat(false); $("askInput").focus();
 }
 $("askForm").onsubmit = e => { e.preventDefault(); ask($("askInput").value); };
-$("keyForm").onsubmit = async e => { e.preventDefault(); await call("claudeKey", { key: $("keyInput").value }); $("keyInput").value = ""; toast("Key saved on this phone"); refresh(); };
 $("clearChatBtn").onclick = () => {
   if (!chat.length) { toast("The chat is already empty"); return; }
   if (confirm("Clear all past questions and answers?")) { chat = []; store.set("wl.chat", chat); renderChat(); toast("Chat cleared"); }
 };
 $("keyBtn").onclick = async () => {
-  if (app?.hasClaudeKey && !confirm("Sign out of Claude? Ask Claude stops working until you sign in again.")) return;
-  await call("claudeLogout"); await refresh();
+  if (app?.hasClaudeKey) {
+    if (!confirm("Remove the API key? Questions will open in the Claude app instead.")) return;
+    await call("claudeLogout"); toast("Key removed"); return refresh();
+  }
+  const key = (prompt("Paste an Anthropic API key (optional; from console.anthropic.com → API keys)", "") || "").trim();
+  if (!key) return;
+  toast("Checking the key…");
+  await call("claudeLogin", { key, name: "" }); toast("Key saved: answers now appear in Watch Link"); refresh();
 };
 renderChat();
 
