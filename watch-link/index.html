@@ -112,6 +112,8 @@ li{margin:3px 0}
     <section class="panel" aria-labelledby="hrH">
       <div class="head"><h2 id="hrH">Heart rate</h2><span class="eyebrow" id="hrState">Waiting</span></div>
       <div class="big" id="bpm">–<small>bpm</small></div>
+      <div class="btns"><button type="button" class="primary" id="measureBtn">Measure now</button>
+        <span class="muted" id="measureMsg" role="status" style="font-size:13px">Asks the watch to take a reading (about 30 seconds).</span></div>
       <div class="stats">
         <div class="stat"><span class="eyebrow">Low</span><b id="hrMin">–</b></div>
         <div class="stat"><span class="eyebrow">Avg</span><b id="hrAvg">–</b></div>
@@ -129,6 +131,26 @@ li{margin:3px 0}
       <button id="copyBtn" type="button" disabled>Copy</button>
       <a href="https://claude.ai/artifact/M9s2WGPGC8fTm4bbmyNqEK" target="_blank" rel="noopener">Open Wrist Log</a>
     </div>
+  </section>
+
+  <section class="panel" aria-labelledby="toolsH">
+    <div class="head"><h2 id="toolsH">Watch tools</h2><span class="eyebrow">MoYoung commands</span></div>
+    <p class="muted" style="font-size:13px">Asks the watch directly, the way NoiseFit does. Commands from Gadgetbridge's Da Fit work and the ColorFit Icon 4 protocol project. Every reply also goes to the event log below.</p>
+    <div class="btns">
+      <button type="button" data-tool="steps">Steps today</button>
+      <button type="button" data-tool="pastSteps">Past 2 days</button>
+      <button type="button" data-tool="hrHistory">Heart-rate history</button>
+      <button type="button" data-tool="sleep">Last night's sleep</button>
+      <button type="button" data-tool="find">Find my watch</button>
+    </div>
+    <div class="btns">
+      <button type="button" class="small" data-tool="h24">24-hour clock</button>
+      <button type="button" class="small" data-tool="h12">12-hour clock</button>
+      <label style="display:inline-flex;align-items:center;gap:6px">Built-in face
+        <input id="faceIndex" type="number" min="1" max="20" value="1" style="width:64px"></label>
+      <button type="button" class="small" data-tool="face">Show face</button>
+    </div>
+    <dl id="toolOut"><dt>Result</dt><dd class="muted">Connect, then tap a tool.</dd></dl>
   </section>
 
   <section class="panel" aria-labelledby="upH">
@@ -258,6 +280,162 @@ function onHr(ev) {
   log("notify", HR_CHAR, bytes, hr ? `${hr.bpm} bpm` : "");
   if (hr && hr.bpm > 25 && hr.bpm < 230 && hr.contact !== false) { hrSamples.push({ t: Date.now(), bpm: hr.bpm }); renderHr(); }
 }
+
+// ---------- MoYoung handshake ----------
+// NoiseFit sends this right after connecting (sequence documented by the ColorFit Icon 4
+// reverse-engineering project, github.com/starfreck/colorfit-icon4-protocol). Without it the
+// watch may ignore some commands. Replies are logged so we can see what the watch says.
+let handshaken = null;
+async function handshake() {
+  if (!device?.gatt?.connected) return;
+  if (handshaken === device) return;
+  let svc;
+  try { svc = await device.gatt.getPrimaryService(MOYOUNG); } catch (_) { return; }   // not a MoYoung watch
+  const out = await svc.getCharacteristic(FEE(2)), inn = await svc.getCharacteristic(FEE(3));
+  const onReply = ev => log("notify", FEE(3), bytesOf(ev.target.value), "handshake reply");
+  inn.addEventListener("characteristicvaluechanged", onReply);
+  await inn.startNotifications();
+  const packet = (cmd, payload) => Uint8Array.from([0xfe, 0xea, 0x20, payload.length + 5, cmd, ...payload]);
+  const now = new Date();
+  // The watch keeps local wall-clock time as if it were GMT+8.
+  const t = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds()) / 1000) - 8 * 3600);
+  const tz = -now.getTimezoneOffset() * 60;
+  const steps = [
+    ["hello", packet(0xb9, [0x0e])],
+    ["app protocol", packet(0xbd, [0x16, 0x00])],
+    ["device info", packet(0x5a, [0x00])],
+    ["time", packet(0x31, [(t >>> 24) & 255, (t >>> 16) & 255, (t >>> 8) & 255, t & 255, 8])],
+    ["timezone", packet(0xbb, [7, 0, tz & 255, (tz >> 8) & 255, (tz >> 16) & 255, (tz >> 24) & 255])],
+  ];
+  for (const [name, b] of steps) {
+    log("write", FEE(2), b, `handshake: ${name}`);
+    await (out.writeValueWithoutResponse ? out.writeValueWithoutResponse(b) : out.writeValue(b));
+    await new Promise(r => setTimeout(r, 400));
+  }
+  setTimeout(() => inn.removeEventListener("characteristicvaluechanged", onReply), 3000);
+  handshaken = device;
+}
+
+// ---------- watch tools ----------
+// Sends one MoYoung command and collects the replies with the same command number for a few seconds.
+async function moyoung(cmd, payload = [], waitMs = 2500) {
+  if (!device?.gatt?.connected) throw new Error("Connect to the watch first.");
+  const svc = await device.gatt.getPrimaryService(MOYOUNG);
+  await handshake();
+  const out = await svc.getCharacteristic(FEE(2)), inn = await svc.getCharacteristic(FEE(3));
+  const replies = [];
+  const onPacket = ev => {
+    const b = bytesOf(ev.target.value);
+    if (b.length >= 5 && b[0] === 0xfe && b[1] === 0xea && b[4] === cmd) { replies.push(b.slice(5)); log("notify", FEE(3), b, `reply to 0x${cmd.toString(16)}`); }
+  };
+  inn.addEventListener("characteristicvaluechanged", onPacket);
+  await inn.startNotifications();
+  const pkt = Uint8Array.from([0xfe, 0xea, 0x20, payload.length + 5, cmd, ...payload]);
+  log("write", FEE(2), pkt, `command 0x${cmd.toString(16)}`);
+  await (out.writeValueWithoutResponse ? out.writeValueWithoutResponse(pkt) : out.writeValue(pkt));
+  await new Promise(r => setTimeout(r, waitMs));
+  inn.removeEventListener("characteristicvaluechanged", onPacket);
+  return replies;
+}
+const u24 = (b, i) => b[i] | (b[i + 1] << 8) | (b[i + 2] << 16);
+const stepsText = b => b.length >= 9 ? `${u24(b, 0).toLocaleString()} steps · ${(u24(b, 3) / 1000).toFixed(2)} km · ${u24(b, 6)} kcal` : null;
+const hex = b => toHex(b) || "(empty)";
+function showTool(rows) {
+  $("toolOut").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${String(v).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c])}</dd>`).join("");
+}
+const tools = {
+  async steps() {
+    const svc = await device.gatt.getPrimaryService(MOYOUNG);
+    let live = null;
+    try { live = bytesOf(await (await svc.getCharacteristic(FEE(1))).readValue()); log("read", FEE(1), live, "steps characteristic"); } catch (_) {}
+    const r = await moyoung(0x33, [0]);
+    return [["fee1 (live)", live ? (stepsText(live) || hex(live)) : "not readable"],
+            ["Command 0x33 [0]", r.length ? r.map(b => stepsText(b.slice(1)) || hex(b)).join(" | ") : "no reply"]];
+  },
+  async pastSteps() {
+    const rows = [];
+    for (const [arg, label] of [[2, "Yesterday"], [1, "Day before"]]) {   // Gadgetbridge: the official names are swapped
+      const r = await moyoung(0x33, [arg]);
+      rows.push([label, r.length ? r.map(b => stepsText(b.slice(1)) || hex(b)).join(" | ") : "no reply"]);
+    }
+    return rows;
+  },
+  async hrHistory() {
+    const r = await moyoung(0xab, [0], 4000);
+    const readings = [];
+    for (const b of r) if (b[0] === 0) for (let i = 2; i + 4 < b.length; i += 5) {
+      const ts = (b[i + 1] | (b[i + 2] << 8) | (b[i + 3] << 16) | (b[i + 4] << 24)) >>> 0;
+      if (b[i] > 25 && b[i] < 230) readings.push(`${new Date(ts * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })} = ${b[i]}`);
+    }
+    return [["Readings", readings.length ? readings.slice(-15).join(", ") : (r.length ? "reply not in the Icon 4 format: " + r.map(hex).join(" | ") : "no reply")]];
+  },
+  async sleep() {
+    const r = await moyoung(0x32, [], 3000);
+    const names = ["awake", "light", "deep"];
+    const text = r.map(b => b.length && b.length % 3 === 0
+      ? Array.from({ length: b.length / 3 }, (_, i) => `${String(b[i * 3 + 1]).padStart(2, "0")}:${String(b[i * 3 + 2]).padStart(2, "0")} ${names[b[i * 3]] || b[i * 3]}`).join(", ")
+      : hex(b)).join(" | ");
+    return [["Segments", r.length ? text : "no reply (wear the watch overnight first)"]];
+  },
+  async find() { await moyoung(0x61, [], 500); return [["Find my watch", "Sent: the watch should buzz"]]; },
+  async h24() { await moyoung(0x17, [1], 500); return [["Clock", "Set to 24-hour"]]; },
+  async h12() { await moyoung(0x17, [0], 500); return [["Clock", "Set to 12-hour"]]; },
+  async face() {
+    const n = Math.max(1, Math.min(20, Number($("faceIndex").value) || 1));
+    await moyoung(0x19, [n], 800);
+    return [["Built-in face", `Asked the watch to show face ${n}`]];
+  },
+};
+document.querySelectorAll("[data-tool]").forEach(btn => btn.onclick = async () => {
+  const all = document.querySelectorAll("[data-tool]");
+  all.forEach(b => b.disabled = true);
+  showTool([["Result", "Asking the watch…"]]);
+  try { showTool(await tools[btn.dataset.tool]()); }
+  catch (e) { showTool([["Result", errorText(e)]]); }
+  all.forEach(b => b.disabled = false);
+});
+
+// ---------- measure on demand ----------
+// The Icon 2 doesn't stream the standard heart-rate characteristic. Instead, ask it to take a
+// reading with its own command (MoYoung CMD 0x6D: FE EA 20 06 6D 00 = start, ... FF = stop).
+// The watch answers on fee3 with FE EA 20 06 6D <bpm> once the reading is done.
+async function measureHr() {
+  const msg = t => { $("measureMsg").textContent = t; };
+  if (!device?.gatt?.connected) { msg("Connect to the watch first."); return; }
+  let svc;
+  try { svc = await device.gatt.getPrimaryService(MOYOUNG); }
+  catch (_) { msg("This watch doesn't have the MoYoung service (feea)."); return; }
+  await handshake();
+  const out = await svc.getCharacteristic(FEE(2)), inn = await svc.getCharacteristic(FEE(3));
+  const send = bytes => { const b = Uint8Array.from(bytes); log("write", FEE(2), b, ""); return out.writeValueWithoutResponse ? out.writeValueWithoutResponse(b) : out.writeValue(b); };
+  let timer, done = false;
+  const finish = async text => {
+    if (done) return; done = true;
+    clearTimeout(timer);
+    inn.removeEventListener("characteristicvaluechanged", onPacket);
+    try { await send([0xfe, 0xea, 0x20, 0x06, 0x6d, 0xff]); } catch (_) {}
+    msg(text); $("measureBtn").disabled = false;
+  };
+  const onPacket = ev => {
+    const b = bytesOf(ev.target.value);
+    log("notify", FEE(3), b, "reply while measuring");
+    if (b.length >= 6 && b[0] === 0xfe && b[1] === 0xea && b[4] === 0x6d && b[5] > 25 && b[5] < 230) {
+      hrSamples.push({ t: Date.now(), bpm: b[5] }); renderHr();
+      finish(`Measured ${b[5]} bpm at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
+    }
+  };
+  $("measureBtn").disabled = true;
+  msg("Measuring… keep the watch snug on your wrist (about 30 seconds).");
+  try {
+    inn.addEventListener("characteristicvaluechanged", onPacket);
+    await inn.startNotifications();
+    await send([0xfe, 0xea, 0x20, 0x06, 0x6d, 0x00]);
+    timer = setTimeout(() => finish("No reading from the watch after 60 seconds. Send a screenshot of the event log below."), 60000);
+  } catch (e) {
+    finish(`Couldn't start a measurement: ${errorText(e)}`);
+  }
+}
+$("measureBtn").onclick = measureHr;
 
 // ---------- explorer ----------
 async function readChar(ch, out) {
@@ -404,6 +582,7 @@ async function openDevice(d, { fromSaved = false, quiet = false, keepData = fals
   if (!device.watchLinkListening) {
     device.watchLinkListening = true;
     device.addEventListener("gattserverdisconnected", () => {
+      handshaken = null;
       $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; setBusy(false);
       log("info", "", null, userDisconnected ? "disconnected" : "connection dropped");
       saveCache(); renderCached();
@@ -418,6 +597,7 @@ async function openDevice(d, { fromSaved = false, quiet = false, keepData = fals
     $("connState").textContent = "Connected"; $("disconnectBtn").disabled = false;
     log("info", "", null, `connected to ${device.name || device.id}`);
     await explore(server);
+    handshake().catch(e => log("error", "", null, `handshake failed: ${errorText(e)}`));
     return true;
   } catch (e) {
     $("connState").textContent = "Couldn't connect"; setBusy(false);
@@ -487,9 +667,9 @@ async function uploadFace() {
   if (maker && maker !== "MOYOUNG-V2") { msg(`The watch reports "${maker}", not MOYOUNG-V2, so this face format may not fit it. Upload stopped.`); return; }
   if (!confirm(`Upload ${faceName} to ${device.name || "the watch"}?${maker ? "" : "\n\nThe watch didn't report its platform, so compatibility can't be checked."}\n\nKeep this page open until it finishes.`)) return;
 
+  await handshake().catch(() => {});
   let notify, onNotify, heard = 0;
   uploading = true; refreshUpload(); setBusy(true);
-  window.watchLinkNative?.("setUploading", { on: true }).catch(() => {});
   $("uploadProgress").hidden = false; $("uploadProgress").value = 0;
   msg("Starting upload…");
   try {
@@ -532,7 +712,6 @@ async function uploadFace() {
   } finally {
     if (notify && onNotify) notify.removeEventListener("characteristicvaluechanged", onNotify);
     uploading = false; refreshUpload(); setBusy(!!device?.gatt?.connected);
-    window.watchLinkNative?.("setUploading", { on: false }).catch(() => {});
     if (device?.gatt?.connected) $("disconnectBtn").disabled = false;
   }
 }

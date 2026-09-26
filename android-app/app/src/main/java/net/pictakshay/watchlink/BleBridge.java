@@ -24,12 +24,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * The JavaScript side (ble-polyfill.js) calls {@link #call} with a method name, JSON arguments
@@ -42,12 +39,7 @@ public class BleBridge {
     private final WebView web;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final List<Runnable> waitingForService = new ArrayList<>();
-    private final ExecutorService background = Executors.newSingleThreadExecutor();
     private BleService service;
-
-    /** Methods for the app's own panels (sync, weather, music, Ask Claude); they don't need Bluetooth permission. */
-    private static final List<String> APP_METHODS = Arrays.asList("appData", "music", "openMusicApp", "openClaude",
-        "weatherCity", "weatherUseLocation", "setUploading");
 
     BleBridge(MainActivity activity, WebView web) {
         this.activity = activity;
@@ -83,7 +75,6 @@ public class BleBridge {
         };
         try {
             JSONObject a = new JSONObject(argsJson == null || argsJson.isEmpty() ? "{}" : argsJson);
-            if (APP_METHODS.contains(method)) { appMethod(method, a, result); return; }
             if (!activity.hasBluetoothPermissions() && !method.equals("availability")) {
                 result.fail("SecurityError", "Allow Watch Link to use Bluetooth (Nearby devices) in Android settings.");
                 return;
@@ -104,91 +95,11 @@ public class BleBridge {
                     break;
                 case "startNotifications": service.setNotify(a.getString("service"), a.getString("char"), true, result); break;
                 case "stopNotifications": service.setNotify(a.getString("service"), a.getString("char"), false, result); break;
-                case "syncNow": service.sync().sync("manual"); result.ok(null); break;
-                case "findWatch": service.sync().findWatch(); result.ok(null); break;
-                case "weatherNow": service.sync().sendWeather(result); break;
                 default: result.fail("NotSupportedError", "Unknown method " + method);
             }
         } catch (JSONException | IllegalArgumentException e) {
             result.fail("TypeError", String.valueOf(e.getMessage()));
         }
-    }
-
-    // ---------- app panels: sync, weather, music, Ask Claude ----------
-
-    private void appMethod(String method, JSONObject a, BleService.Result result) throws JSONException {
-        WatchSync sync = service.sync();
-        switch (method) {
-            case "appData":
-                result.ok(new JSONObject()
-                    .put("data", sync.data().json())
-                    .put("status", sync.status())
-                    .put("connected", service.isReady())
-                    .put("weatherPlace", Weather.hasPlace(activity))
-                    .put("weatherCity", prefs().getString("weatherCity", "")));
-                break;
-            case "setUploading": sync.setUploading(a.optBoolean("on")); result.ok(null); break;
-            case "music": {
-                String op = a.optString("op");
-                sync.music().press("next".equals(op) ? WatchProtocol.OP_NEXT : "previous".equals(op) ? WatchProtocol.OP_PREVIOUS : WatchProtocol.OP_PLAY_PAUSE);
-                result.ok(null);
-                break;
-            }
-            case "openMusicApp": {
-                boolean spotify = "spotify".equals(a.optString("app"));
-                if (sync.music().open(spotify ? MusicControl.SPOTIFY : MusicControl.YT_MUSIC)) result.ok(null);
-                else result.fail("NotFoundError", (spotify ? "Spotify" : "YouTube Music") + " isn't installed on this phone.");
-                break;
-            }
-            case "openClaude": {
-                // Free with a Claude Pro/Max plan: hand the question plus the watch data to the Claude app
-                // (or claude.ai in the browser).
-                String text = a.optString("question").trim() + "\n\nThis is my data from my Noise Icon 2 smartwatch, synced by the "
-                    + "Watch Link app. Please answer in plain language, and tell me if the data is too sparse.\n\n"
-                    + sync.data().summary(System.currentTimeMillis());
-                android.content.Intent app = new android.content.Intent(android.content.Intent.ACTION_SEND)
-                    .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, text).setPackage("com.anthropic.claude")
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    activity.startActivity(app);
-                    result.ok("app");
-                } catch (android.content.ActivityNotFoundException e) {
-                    String q = text.length() > 6000 ? text.substring(0, 6000) : text;
-                    try {
-                        activity.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse("https://claude.ai/new?q=" + java.net.URLEncoder.encode(q, "UTF-8"))));
-                        result.ok("web");
-                    } catch (Exception ex) { result.fail("NotFoundError", "Couldn't open Claude: " + ex.getMessage()); }
-                }
-                break;
-            }
-            case "weatherCity": {
-                String name = a.optString("name").trim();
-                background.execute(() -> {
-                    try {
-                        String place = Weather.setCity(activity, name);
-                        main.post(() -> { result.ok(place); if (service.isReady()) service.sync().sendWeather(null); });
-                    } catch (Exception e) {
-                        main.post(() -> result.fail("NotFoundError", String.valueOf(e.getMessage())));
-                    }
-                });
-                break;
-            }
-            case "weatherUseLocation":
-                activity.requestLocation(granted -> {
-                    if (!granted) { result.fail("SecurityError", "Location permission was not given. You can type a city instead."); return; }
-                    Weather.useDeviceLocation(activity);
-                    if (!Weather.hasPlace(activity)) { result.fail("NotFoundError", "The phone has no recent location yet. Open Maps once, or type a city."); return; }
-                    result.ok(null);
-                    if (service.isReady()) service.sync().sendWeather(null);
-                });
-                break;
-            default: result.fail("NotSupportedError", "Unknown method " + method);
-        }
-    }
-
-    private android.content.SharedPreferences prefs() {
-        return activity.getSharedPreferences("watchlink", Context.MODE_PRIVATE);
     }
 
     // ---------- device picker ----------
