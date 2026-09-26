@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#000}
+.face{width:240px;height:286px;position:relative;overflow:hidden;font-family:"Segoe UI",Roboto,Arial,sans-serif}
+svg{display:block}
+</style></head><body>
+
+<!-- 1. One Dark: Samsung One UI inspired activity rings, time space at top -->
+<div class="face" id="onedark"><svg width="240" height="286" viewBox="0 0 240 286">
+  <defs><radialGradient id="g1" cx="50%" cy="0%" r="90%"><stop offset="0" stop-color="#1b2236"/><stop offset="1" stop-color="#000"/></radialGradient></defs>
+  <rect width="240" height="286" fill="url(#g1)"/>
+  <!-- time goes top (watch overlay); leave 20..120 clear -->
+  <g transform="translate(120,188)" fill="none" stroke-linecap="round" stroke-width="10">
+    <circle r="54" stroke="#1d3b2a"/><circle r="54" stroke="#3ddc84" stroke-dasharray="250 340" transform="rotate(-90)"/>
+    <circle r="40" stroke="#3b1d24"/><circle r="40" stroke="#ff5470" stroke-dasharray="180 252" transform="rotate(-90)"/>
+    <circle r="26" stroke="#27204a"/><circle r="26" stroke="#8b7bff" stroke-dasharray="120 164" transform="rotate(-90)"/>
+  </g>
+  <!-- centre heart -->
+  <path transform="translate(111,180)" d="M9 16 C9 16 0 10 0 4.5 C0 1.5 2.5 0 4.5 0 C6.5 0 8 1.2 9 2.8 C10 1.2 11.5 0 13.5 0 C15.5 0 18 1.5 18 4.5 C18 10 9 16 9 16Z" fill="#ff5470"/>
+  <g font-size="9" font-weight="600" fill="#9aa4b8" letter-spacing=".6">
+    <text x="30" y="266">STEPS</text><text x="102" y="266">HEART</text><text x="176" y="266">SLEEP</text>
+  </g>
+  <g><rect x="30" y="252" width="30" height="3" rx="1.5" fill="#3ddc84"/><rect x="102" y="252" width="32" height="3" rx="1.5" fill="#ff5470"/><rect x="176" y="252" width="31" height="3" rx="1.5" fill="#8b7bff"/></g>
+</svg></div>
+
+<!-- 2. Tiles: One UI app-grid look, time space at top -->
+<div class="face" id="tiles"><svg width="240" height="286" viewBox="0 0 240 286">
+  <rect width="240" height="286" fill="#000"/>
+  <g id="t">
+    <!-- row 1 -->
+    <rect x="16" y="128" width="98" height="66" rx="22" fill="#12301f"/>
+    <rect x="126" y="128" width="98" height="66" rx="22" fill="#3a1520"/>
+    <rect x="16" y="204" width="98" height="66" rx="22" fill="#221c45"/>
+    <rect x="126" y="204" width="98" height="66" rx="22" fill="#10283f"/>
+  </g>
+  <!-- icons -->
+  <g fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M44 172 l8-16 6 10 6-6 8 12" stroke="#3ddc84"/>
+    <path transform="translate(163,150)" d="M12 20 C12 20 0 12 0 6 C0 2 3 0 6 0 C8.5 0 10.5 1.5 12 3.5 C13.5 1.5 15.5 0 18 0 C21 0 24 2 24 6 C24 12 12 20 12 20Z" stroke="#ff5470"/>
+    <path transform="translate(52,224)" d="M18 22 A12 12 0 1 1 22 4 A9 9 0 0 0 18 22Z" stroke="#8b7bff"/>
+    <g transform="translate(163,224)" stroke="#4fb3ff"><circle cx="12" cy="11" r="6"/><path d="M12 0v2M12 20v2M0 11h2M22 11h2M3.5 2.5l1.5 1.5M19 18l1.5 1.5M3.5 19.5L5 18M19 4l1.5-1.5"/></g>
+  </g>
+  <g font-size="10" font-weight="600" fill="#c9d1e0" text-anchor="middle">
+    <text x="65" y="188">Activity</text><text x="175" y="188">Heart</text><text x="65" y="264">Sleep</text><text x="175" y="264">Weather</text>
+  </g>
+</svg></div>
+
+<!-- 3. Minimal Jade: calm gradient, time centred -->
+<div class="face" id="jade"><svg width="240" height="286" viewBox="0 0 240 286">
+  <defs>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b3d36"/><stop offset=".55" stop-color="#062321"/><stop offset="1" stop-color="#020b0a"/></linearGradient>
+  </defs>
+  <rect width="240" height="286" fill="url(#g3)"/>
+  <g fill="none" stroke="#2fbf9f" stroke-opacity=".18" stroke-width="1.2">
+    <circle cx="240" cy="0" r="80"/><circle cx="240" cy="0" r="120"/><circle cx="240" cy="0" r="160"/>
+    <circle cx="0" cy="286" r="70"/><circle cx="0" cy="286" r="110"/>
+  </g>
+  <!-- ticks ring framing centre time -->
+  <g transform="translate(120,143)" stroke="#7fe3c8" stroke-linecap="round">
+    <g stroke-opacity=".55" stroke-width="2">
+      <line y1="-96" y2="-88"/><line y1="96" y2="88"/><line x1="-96" x2="-88"/><line x1="96" x2="88"/>
+    </g>
+  </g>
+  
+</svg></div>
+</body></html>
