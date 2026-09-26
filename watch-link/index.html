@@ -261,6 +261,41 @@ function onHr(ev) {
   if (hr && hr.bpm > 25 && hr.bpm < 230 && hr.contact !== false) { hrSamples.push({ t: Date.now(), bpm: hr.bpm }); renderHr(); }
 }
 
+// ---------- MoYoung handshake ----------
+// NoiseFit sends this right after connecting (sequence documented by the ColorFit Icon 4
+// reverse-engineering project, github.com/starfreck/colorfit-icon4-protocol). Without it the
+// watch may ignore some commands. Replies are logged so we can see what the watch says.
+let handshaken = null;
+async function handshake() {
+  if (!device?.gatt?.connected) return;
+  if (handshaken === device) return;
+  let svc;
+  try { svc = await device.gatt.getPrimaryService(MOYOUNG); } catch (_) { return; }   // not a MoYoung watch
+  const out = await svc.getCharacteristic(FEE(2)), inn = await svc.getCharacteristic(FEE(3));
+  const onReply = ev => log("notify", FEE(3), bytesOf(ev.target.value), "handshake reply");
+  inn.addEventListener("characteristicvaluechanged", onReply);
+  await inn.startNotifications();
+  const packet = (cmd, payload) => Uint8Array.from([0xfe, 0xea, 0x20, payload.length + 5, cmd, ...payload]);
+  const now = new Date();
+  // The watch keeps local wall-clock time as if it were GMT+8.
+  const t = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds()) / 1000) - 8 * 3600);
+  const tz = -now.getTimezoneOffset() * 60;
+  const steps = [
+    ["hello", packet(0xb9, [0x0e])],
+    ["app protocol", packet(0xbd, [0x16, 0x00])],
+    ["device info", packet(0x5a, [0x00])],
+    ["time", packet(0x31, [(t >>> 24) & 255, (t >>> 16) & 255, (t >>> 8) & 255, t & 255, 8])],
+    ["timezone", packet(0xbb, [7, 0, tz & 255, (tz >> 8) & 255, (tz >> 16) & 255, (tz >> 24) & 255])],
+  ];
+  for (const [name, b] of steps) {
+    log("write", FEE(2), b, `handshake: ${name}`);
+    await (out.writeValueWithoutResponse ? out.writeValueWithoutResponse(b) : out.writeValue(b));
+    await new Promise(r => setTimeout(r, 400));
+  }
+  setTimeout(() => inn.removeEventListener("characteristicvaluechanged", onReply), 3000);
+  handshaken = device;
+}
+
 // ---------- measure on demand ----------
 // The Icon 2 doesn't stream the standard heart-rate characteristic. Instead, ask it to take a
 // reading with its own command (MoYoung CMD 0x6D: FE EA 20 06 6D 00 = start, ... FF = stop).
@@ -271,6 +306,7 @@ async function measureHr() {
   let svc;
   try { svc = await device.gatt.getPrimaryService(MOYOUNG); }
   catch (_) { msg("This watch doesn't have the MoYoung service (feea)."); return; }
+  await handshake();
   const out = await svc.getCharacteristic(FEE(2)), inn = await svc.getCharacteristic(FEE(3));
   const send = bytes => { const b = Uint8Array.from(bytes); log("write", FEE(2), b, ""); return out.writeValueWithoutResponse ? out.writeValueWithoutResponse(b) : out.writeValue(b); };
   let timer, done = false;
@@ -447,6 +483,7 @@ async function openDevice(d, { fromSaved = false, quiet = false, keepData = fals
   if (!device.watchLinkListening) {
     device.watchLinkListening = true;
     device.addEventListener("gattserverdisconnected", () => {
+      handshaken = null;
       $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; setBusy(false);
       log("info", "", null, userDisconnected ? "disconnected" : "connection dropped");
       saveCache(); renderCached();
@@ -461,6 +498,7 @@ async function openDevice(d, { fromSaved = false, quiet = false, keepData = fals
     $("connState").textContent = "Connected"; $("disconnectBtn").disabled = false;
     log("info", "", null, `connected to ${device.name || device.id}`);
     await explore(server);
+    handshake().catch(e => log("error", "", null, `handshake failed: ${errorText(e)}`));
     return true;
   } catch (e) {
     $("connState").textContent = "Couldn't connect"; setBusy(false);
@@ -530,6 +568,7 @@ async function uploadFace() {
   if (maker && maker !== "MOYOUNG-V2") { msg(`The watch reports "${maker}", not MOYOUNG-V2, so this face format may not fit it. Upload stopped.`); return; }
   if (!confirm(`Upload ${faceName} to ${device.name || "the watch"}?${maker ? "" : "\n\nThe watch didn't report its platform, so compatibility can't be checked."}\n\nKeep this page open until it finishes.`)) return;
 
+  await handshake().catch(() => {});
   let notify, onNotify, heard = 0;
   uploading = true; refreshUpload(); setBusy(true);
   $("uploadProgress").hidden = false; $("uploadProgress").value = 0;
