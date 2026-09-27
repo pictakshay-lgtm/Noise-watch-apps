@@ -113,6 +113,8 @@
     },
     event(json) {
       const ev = JSON.parse(json);
+      // The service's connection state, for the page's status pill (app only).
+      if (ev.type === "state") { window.dispatchEvent(new CustomEvent("watchlinkstate", { detail: ev })); return; }
       const d = devices.get(ev.id); if (!d) return;
       if (ev.type === "notify") {
         const c = d._chars.get(`${full(ev.service)}|${full(ev.char)}`); if (!c) return;

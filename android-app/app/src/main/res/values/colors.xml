@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Watch Link palette: brown and beige (same values as the page's colour tokens). -->
+    <color name="brown">#FF6B3F1D</color>
+    <color name="beige">#FFE6D3B3</color>
+    <color name="cream">#FFFBF8EF</color>
+    <color name="night">#FF17110C</color>
+</resources>
