@@ -133,6 +133,17 @@ li{margin:3px 0}
     </div>
   </section>
 
+  <section class="panel" aria-labelledby="musicH">
+    <div class="head"><h2 id="musicH">Music</h2><span class="eyebrow">YouTube Music</span></div>
+    <p class="muted" style="font-size:13px" id="musicNote">The music buttons on your watch control YouTube Music (or whatever is playing), even with this app closed.</p>
+    <div class="btns">
+      <button type="button" class="primary" id="ytBtn">Open YouTube Music</button>
+      <button type="button" data-key="1" aria-label="Previous track">⏮ Prev</button>
+      <button type="button" data-key="0" aria-label="Play or pause">⏯ Play / pause</button>
+      <button type="button" data-key="2" aria-label="Next track">⏭ Next</button>
+    </div>
+  </section>
+
   <section class="panel" aria-labelledby="toolsH">
     <div class="head"><h2 id="toolsH">Watch tools</h2><span class="eyebrow">MoYoung commands</span></div>
     <p class="muted" style="font-size:13px">Asks the watch directly, the way NoiseFit does. Commands from Gadgetbridge's Da Fit work and the ColorFit Icon 4 protocol project. Every reply also goes to the event log below.</p>
@@ -314,6 +325,15 @@ async function handshake() {
   }
   setTimeout(() => inn.removeEventListener("characteristicvaluechanged", onReply), 3000);
   handshaken = device;
+}
+
+// ---------- music (Android app only) ----------
+if (window.watchLinkNative) {
+  $("ytBtn").onclick = () => window.watchLinkNative("openYtMusic").catch(e => log("error", "", null, errorText(e)));
+  document.querySelectorAll("[data-key]").forEach(b => b.onclick = () => window.watchLinkNative("mediaKey", { op: Number(b.dataset.key) }));
+} else {
+  $("musicNote").textContent = "Music controls work in the Watch Link Android app.";
+  document.querySelectorAll("#ytBtn, [data-key]").forEach(b => b.disabled = true);
 }
 
 // ---------- watch tools ----------

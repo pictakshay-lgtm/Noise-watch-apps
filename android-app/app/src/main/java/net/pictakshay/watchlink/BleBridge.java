@@ -75,6 +75,14 @@ public class BleBridge {
         };
         try {
             JSONObject a = new JSONObject(argsJson == null || argsJson.isEmpty() ? "{}" : argsJson);
+            if (method.equals("mediaKey")) { service.mediaKey(a.optInt("op")); result.ok(null); return; }
+            if (method.equals("openYtMusic")) {
+                android.content.Intent i = activity.getPackageManager().getLaunchIntentForPackage(BleService.YT_MUSIC);
+                if (i == null) i = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://music.youtube.com"));
+                activity.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+                result.ok(null);
+                return;
+            }
             if (!activity.hasBluetoothPermissions() && !method.equals("availability")) {
                 result.fail("SecurityError", "Allow Watch Link to use Bluetooth (Nearby devices) in Android settings.");
                 return;
