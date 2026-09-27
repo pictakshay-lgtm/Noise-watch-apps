@@ -41,9 +41,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: app-v${{ github.run_number }}
-          name: Watch Link app v0.1.${{ github.run_number }}
+          name: Health Watcher app v0.1.${{ github.run_number }}
           make_latest: true
           files: WatchLink.apk
           body: |
-            Android app for Watch Link, built from ${{ github.sha }}.
+            Android app for Health Watcher, built from ${{ github.sha }}.
             Install: download WatchLink.apk on the phone, open it, and allow installing from this source.

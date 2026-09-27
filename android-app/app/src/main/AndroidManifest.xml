@@ -32,7 +32,7 @@
     </queries>
 
     <application
-        android:label="Watch Link"
+        android:label="Health Watcher"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"

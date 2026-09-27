@@ -470,7 +470,7 @@ public class BleService extends Service {
     /** The ongoing notification, drawn from the connection state: the watch's name, then its status. */
     private void startInForeground() {
         boolean on = state.equals("connected");
-        String title = device == null ? "Watch Link" : displayName();
+        String title = device == null ? "Health Watcher" : displayName();
         String text = on ? "● Connected"
             : state.equals("connecting") ? "◌ Connecting…"
             : state.equals("reconnecting") ? "↻ Reconnecting… keep the watch nearby"
