@@ -364,6 +364,7 @@ li{margin:3px 0}
     </div>
     <button type="button" id="ytBtn"><svg class="ic" aria-hidden="true"><use href="#i-open"/></svg>Open YouTube Music</button>
     <p class="muted small center">Health Watcher presses your phone's play, next and previous buttons. It doesn't read the song name or artist.</p>
+    <p class="muted small center" data-watchsig hidden></p>
   </section>
   </div>
 
@@ -385,6 +386,7 @@ li{margin:3px 0}
       <button type="button" id="callTest">Send a test call</button>
     </div>
     <p class="muted small" id="callMsg" aria-live="polite"></p>
+    <p class="muted small" data-watchsig hidden></p>
   </section>
   </div>
 
@@ -732,6 +734,7 @@ async function handshake() {
   let svc;
   try { svc = await device.gatt.getPrimaryService(MOYOUNG); } catch (_) { return; }   // not a MoYoung watch
   const out = await svc.getCharacteristic(FEE(2)), inn = await svc.getCharacteristic(FEE(3));
+  watchSignals(inn);
   const onReply = ev => log("notify", FEE(3), bytesOf(ev.target.value), "handshake reply");
   inn.addEventListener("characteristicvaluechanged", onReply);
   await inn.startNotifications();
@@ -754,6 +757,27 @@ async function handshake() {
   }
   setTimeout(() => inn.removeEventListener("characteristicvaluechanged", onReply), 3000);
   handshaken = device;
+}
+
+// Observation only (roadmap Task 2): shows the last few packets the watch sent, so the code a
+// watch button sends can be read off the Music and Calls screens. It doesn't act on them; the
+// app's own button handling (answer, reject, play/pause) is unchanged.
+const watchSig = [];
+function watchSignals(inn) {
+  if (inn.watchLinkSignals) return;   // characteristics are new objects after each reconnect
+  inn.watchLinkSignals = true;
+  inn.addEventListener("characteristicvaluechanged", ev => {
+    const b = bytesOf(ev.target.value);
+    if (b.length < 5 || b[0] !== 0xfe || b[1] !== 0xea) return;
+    const code = toHex(b.slice(4, 12)) + (b.length > 12 ? " …" : "");
+    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    watchSig.unshift(`${time}  ${code}${b[4] === 0x67 ? " (button)" : ""}`);
+    watchSig.length = Math.min(watchSig.length, 4);
+    document.querySelectorAll("[data-watchsig]").forEach(el => {
+      el.hidden = false;
+      el.textContent = "Last from the watch (for testing): " + watchSig.join(" · ");
+    });
+  });
 }
 
 // ---------- music (Android app only) ----------
