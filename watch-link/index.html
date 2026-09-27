@@ -157,7 +157,8 @@ html:not(.app) .app-only{display:none}
 button{background:var(--sunk);border-color:transparent}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 button.text{background:none;border:0;color:var(--accent);padding:10px 6px}
-button:not(:disabled):active{transform:scale(.97)}
+button:not(:disabled):not(.unavailable):active{transform:scale(.97)}
+button.unavailable{opacity:.5;cursor:not-allowed}
 button{transition:transform .08s ease,background-color .15s ease}
 #ytBtn{display:inline-flex;align-items:center;justify-content:center;gap:8px}
 /* connection indicator: solid dot = connected, spinning ring = working, hollow ring = not connected */
@@ -292,6 +293,7 @@ li{margin:3px 0}
     <button type="button" class="q" data-goto="music"><svg class="ic" aria-hidden="true"><use href="#i-music"/></svg><span>Music</span></button>
     <button type="button" class="q" data-goto="calls"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg><span>Calls</span></button>
   </div>
+  <p class="muted small" id="findMsg" role="status" hidden></p>
 
   <section class="panel" aria-labelledby="hrH">
     <div class="head"><h3 id="hrH">Heart rate</h3><span class="eyebrow" id="hrState">Waiting</span></div>
@@ -498,7 +500,16 @@ li{margin:3px 0}
     document.querySelectorAll("[data-needs-watch]").forEach(function (b) {
       b.disabled = root.dataset.conn !== "on" || (b.id === "qMeasure" && measuring);
     });
+    // The card's Measure now: shown unavailable without a watch. Its disabled flag stays the
+    // measurement's own busy signal, so this uses aria-disabled and blocks the tap instead.
+    var off = root.dataset.conn !== "on";
+    measureBtn.classList.toggle("unavailable", off);
+    measureBtn.setAttribute("aria-disabled", String(off));
   }
+  window.watchLinkNeedsWatch = needsWatch;
+  measureBtn.addEventListener("click", function (e) {
+    if (root.dataset.conn !== "on") { e.stopImmediatePropagation(); e.preventDefault(); }
+  }, true);
   // "Couldn't connect" card: only when the last attempt failed and nothing is retrying.
   function showError() {
     document.getElementById("connError").hidden = !(src.textContent.trim() === "Couldn't connect" && root.dataset.conn === "off");
@@ -833,13 +844,27 @@ const tools = {
     return [["Built-in face", `Asked the watch to show face ${n}`]];
   },
 };
+// A tool started from Home (Find watch) also shows its result there, briefly.
+let findMsgTimer = null;
+function showHomeResult(rows, keep) {
+  const m = $("findMsg");
+  m.textContent = rows.map(r => r[1]).join(" · ");
+  m.hidden = false;
+  clearTimeout(findMsgTimer);
+  if (!keep) findMsgTimer = setTimeout(() => { m.hidden = true; }, 6000);
+}
 document.querySelectorAll("[data-tool]").forEach(btn => btn.onclick = async () => {
-  const all = document.querySelectorAll("[data-tool]");
+  const all = document.querySelectorAll("[data-tool]"), home = !!btn.closest("#p-home");
   all.forEach(b => b.disabled = true);
-  showTool([["Result", "Asking the watch…"]]);
-  try { showTool(await tools[btn.dataset.tool]()); }
-  catch (e) { showTool([["Result", errorText(e)]]); }
+  let rows = [["Result", "Asking the watch…"]];
+  showTool(rows);
+  if (home) showHomeResult(rows, true);
+  try { rows = await tools[btn.dataset.tool](); }
+  catch (e) { rows = [["Result", errorText(e)]]; }
+  showTool(rows);
+  if (home) showHomeResult(rows);
   all.forEach(b => b.disabled = false);
+  if (window.watchLinkNeedsWatch) window.watchLinkNeedsWatch();   // re-apply "needs a connected watch"
 });
 
 // ---------- measure on demand ----------
