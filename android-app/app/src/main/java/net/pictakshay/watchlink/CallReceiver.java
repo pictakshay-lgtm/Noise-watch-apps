@@ -51,7 +51,14 @@ public class CallReceiver extends BroadcastReceiver {
         }
     }
 
-    static boolean isRinging() { return alerted; }
+    private static long testUntil;   // a test call from the Calls card is on the watch
+
+    static boolean isRinging() { return alerted || android.os.SystemClock.uptimeMillis() < testUntil; }
+
+    /** Treats the watch as showing a call for a while, so its buttons can be tried. */
+    static void startTest(long ms) { testUntil = android.os.SystemClock.uptimeMillis() + ms; }
+
+    static void endTest() { testUntil = 0; }
 
     private static void alert(Context app, String who) {
         BleService s = BleService.instance;

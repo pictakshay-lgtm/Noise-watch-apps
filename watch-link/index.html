@@ -163,7 +163,7 @@ li{margin:3px 0}
 
   <section class="panel" aria-labelledby="callsH">
     <div class="head"><h2 id="callsH">Calls</h2><span class="eyebrow">Incoming call alerts</span></div>
-    <p class="muted" style="font-size:13px" id="callNote">When your phone rings, the watch buzzes and shows who's calling. Press reject on the watch to decline the call.</p>
+    <p class="muted" style="font-size:13px" id="callNote">When your phone rings, the watch buzzes and shows who's calling. Answer or reject the call from the watch.</p>
     <div class="btns">
       <button type="button" class="primary" id="callBtn">Turn on call alerts</button>
       <button type="button" id="callTest">Send a test call</button>
@@ -382,7 +382,8 @@ function showCalls(st) {
   $("callBtn").classList.toggle("primary", !st.on);
   $("callMsg").textContent = !st.on ? ""
     : (st.names ? "On: the watch shows the caller's name." : "On: the watch shows \u201cIncoming call\u201d. To see names, allow Call logs and Contacts for Watch Link in Android settings.")
-      + (st.reject ? "" : " Allow Phone for Watch Link to reject calls from the watch.");
+      + (st.reject ? "" : " Allow Phone for Watch Link to answer or reject calls from the watch.")
+      + (st.buttons ? " During the last call the watch sent: " + st.buttons + "." : "");
 }
 if (window.watchLinkNative) {
   let callsOn = false;
@@ -395,7 +396,11 @@ if (window.watchLinkNative) {
     } catch (e) { $("callMsg").textContent = errorText(e); }
   };
   $("callTest").onclick = async () => {
-    try { await window.watchLinkNative("testCall"); $("callMsg").textContent = "Sent. Your watch should show a test call for 6 seconds."; }
+    try {
+      await window.watchLinkNative("testCall");
+      $("callMsg").textContent = "Sent. Your watch shows a test call for 10 seconds: try its answer and reject buttons.";
+      setTimeout(() => window.watchLinkNative("callStatus").then(st => { callsOn = st.on; showCalls(st); }).catch(() => {}), 10500);
+    }
     catch (e) { $("callMsg").textContent = errorText(e); }
   };
 } else {
