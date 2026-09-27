@@ -92,6 +92,7 @@ public class BleService extends Service {
     private int retries;
     private Op current;
     private int mtu = 23;   // negotiated on connect; a write can carry mtu - 3 bytes
+    private String state = "disconnected";   // disconnected | connecting | connected | reconnecting
 
     // ---------- lifecycle ----------
 
@@ -165,6 +166,7 @@ public class BleService extends Service {
         prefs().edit().putString("address", address).putString("name", device.getName()).apply();
         startInForeground("Connecting to " + displayName());
         gatt = device.connectGatt(this, false, callback, BluetoothDevice.TRANSPORT_LE);
+        setState(retries > 0 ? "reconnecting" : "connecting");
     }
 
     void disconnect() {
@@ -175,6 +177,7 @@ public class BleService extends Service {
         failAll("NetworkError", "Disconnected");
         if (wasConnected || device != null) emit("disconnected");
         device = null;
+        setState("disconnected");
         prefs().edit().remove("address").apply(); // don't auto-connect again until the user picks it
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
@@ -274,6 +277,7 @@ public class BleService extends Service {
                     failQueue("NetworkError", "The watch disconnected");
                     if (wasReady) emit("disconnected");
                     if (!userDisconnected && device != null) scheduleReconnect();
+                    else setState("disconnected");
                 }
             });
         }
@@ -295,6 +299,7 @@ public class BleService extends Service {
                 for (Result r : new ArrayList<>(waitingForConnect)) r.ok(null);
                 waitingForConnect.clear();
                 emit("connected");
+                setState("connected");
                 // Listen for the watch's music buttons even when the page isn't open.
                 if (g.getService(UUID.fromString(MOYOUNG)) != null) setNotify(MOYOUNG, MOYOUNG_IN, true, IGNORE);
             });
@@ -407,6 +412,7 @@ public class BleService extends Service {
         long delay = Math.min(30000, 2000L << Math.min(retries, 4));
         retries++;
         startInForeground("Reconnecting to " + displayName() + "…");
+        setState("reconnecting");
         String address = device.getAddress();
         main.postDelayed(() -> { if (!userDisconnected && gatt == null) connect(address, null); }, delay);
     }
@@ -425,6 +431,20 @@ public class BleService extends Service {
             try { gatt.disconnect(); gatt.close(); } catch (RuntimeException ignored) { }
             gatt = null;
         }
+    }
+
+    /** The one connection state the page shows; sent to it on every change. */
+    JSONObject state() {
+        try {
+            return new JSONObject().put("state", state)
+                .put("name", device == null ? JSONObject.NULL : displayName());
+        } catch (JSONException e) { return new JSONObject(); }
+    }
+
+    private void setState(String s) {
+        if (s.equals(state)) return;
+        state = s;
+        try { emit(state().put("type", "state")); } catch (JSONException ignored) { }
     }
 
     private void emit(String type) {

@@ -83,6 +83,7 @@ public class BleBridge {
                 result.ok(null);
                 return;
             }
+            if (method.equals("state")) { result.ok(service.state()); return; }
             if (method.equals("callStatus")) { result.ok(callStatus()); return; }
             if (method.equals("setCalls")) {
                 if (!a.optBoolean("on")) { prefs().edit().putBoolean("calls", false).apply(); result.ok(callStatus()); return; }

@@ -319,8 +319,17 @@ li{margin:3px 0}
   var saved = null; try { saved = localStorage.getItem("tab"); } catch (_) {}
   show(saved || "home", false);
 
-  // The pill in the top bar mirrors the Connect card's own status text; it has no state of its own.
+  // The pill shows the connection's real state. In the app that's the background service's state;
+  // on the web it mirrors the Connect card's own status text. It has no state of its own.
   var src = document.getElementById("connState"), pill = document.getElementById("connPill"), txt = document.getElementById("connPillText");
+  if (window.watchLinkNative) {
+    var labels = { connected: ["on", "Connected"], connecting: ["busy", "Connecting…"], reconnecting: ["busy", "Reconnecting…"], disconnected: ["off", "Not connected"] };
+    var showState = function (st) { var l = labels[st && st.state] || labels.disconnected; pill.dataset.state = l[0]; txt.textContent = l[1]; };
+    window.addEventListener("watchlinkstate", function (e) { showState(e.detail); });
+    showState(null);
+    window.watchLinkNative("state").then(showState).catch(function () {});
+    return;
+  }
   function sync() {
     var t = src.textContent.trim();
     pill.dataset.state = t === "Connected" ? "on" : /^(Connecting|Reconnecting)/.test(t) ? "busy" : "off";
@@ -755,6 +764,8 @@ const MAX_RETRIES = 6;
 function scheduleReconnect(attempt) {
   clearTimeout(retryTimer);
   if (userDisconnected || !device) return;
+  // In the app the background service reconnects by itself; the page follows it (see watchlinkstate).
+  if (window.watchLinkApp) { $("connState").textContent = "Reconnecting…"; return; }
   if (attempt > MAX_RETRIES) {
     $("connState").textContent = "Disconnected";
     log("info", "", null, "gave up reconnecting; tap Connect or Reconnect saved watch");
@@ -768,14 +779,19 @@ function scheduleReconnect(attempt) {
 }
 
 // Returns true when connected. quiet: no banner on failure (used for automatic attempts).
+let opening = false, attached = false;   // attached: this page has opened the watch's services
 async function openDevice(d, { fromSaved = false, quiet = false, keepData = false } = {}) {
+  opening = true;
+  try { return await openDeviceNow(d, { fromSaved, quiet, keepData }); } finally { opening = false; }
+}
+async function openDeviceNow(d, { fromSaved, quiet, keepData }) {
   device = d;
   userDisconnected = false;
   clearTimeout(retryTimer);
   if (!device.watchLinkListening) {
     device.watchLinkListening = true;
     device.addEventListener("gattserverdisconnected", () => {
-      handshaken = null;
+      handshaken = null; attached = false;
       $("connState").textContent = "Disconnected"; $("disconnectBtn").disabled = true; setBusy(false);
       log("info", "", null, userDisconnected ? "disconnected" : "connection dropped");
       saveCache(); renderCached();
@@ -790,6 +806,7 @@ async function openDevice(d, { fromSaved = false, quiet = false, keepData = fals
     $("connState").textContent = "Connected"; $("disconnectBtn").disabled = false;
     log("info", "", null, `connected to ${device.name || device.id}`);
     await explore(server);
+    attached = true;
     handshake().catch(e => log("error", "", null, `handshake failed: ${errorText(e)}`));
     return true;
   } catch (e) {
@@ -809,6 +826,15 @@ async function autoReconnectOnLoad() {
   log("info", "", null, `reconnecting to saved watch ${watch.name}`);
   await openDevice(watch, { quiet: true });
 }
+
+// App only: the service owns the connection. When it (re)connects on its own, attach the page to
+// it again; while it retries, say so.
+window.addEventListener("watchlinkstate", e => {
+  const st = e.detail.state;
+  if (st === "connected" && !attached && !opening) autoReconnectOnLoad();
+  else if (st === "reconnecting" && !attached) $("connState").textContent = "Reconnecting…";
+  else if (st === "disconnected" && !attached) $("connState").textContent = "Disconnected";
+});
 
 $("connectBtn").onclick = () => connect(false);
 $("allBtn").onclick = () => connect(true);
