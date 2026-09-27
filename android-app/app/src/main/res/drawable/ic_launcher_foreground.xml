@@ -5,15 +5,15 @@
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
     <!-- outer waves -->
-    <path android:strokeColor="#FFF4E04D" android:strokeAlpha="0.5" android:strokeWidth="3"
+    <path android:strokeColor="#FFE6D3B3" android:strokeAlpha="0.5" android:strokeWidth="3"
         android:strokeLineCap="round"
         android:pathData="M34.91,34.91A27,27 0,0 0,34.91 73.09M73.09,34.91A27,27 0,0 1,73.09 73.09" />
     <!-- inner waves -->
-    <path android:strokeColor="#FFF4E04D" android:strokeAlpha="0.8" android:strokeWidth="3"
+    <path android:strokeColor="#FFE6D3B3" android:strokeAlpha="0.8" android:strokeWidth="3"
         android:strokeLineCap="round"
         android:pathData="M39.86,39.86A20,20 0,0 0,39.86 68.14M68.14,39.86A20,20 0,0 1,68.14 68.14" />
     <!-- clock face -->
-    <path android:fillColor="#FFF4E04D"
+    <path android:fillColor="#FFE6D3B3"
         android:pathData="M54,40.5a13.5,13.5 0,1 1,0 27a13.5,13.5 0,1 1,0 -27z" />
     <!-- hands -->
     <path android:strokeColor="#FF4A2A12" android:strokeWidth="2.6" android:strokeLineCap="round"

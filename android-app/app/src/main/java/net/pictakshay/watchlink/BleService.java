@@ -108,7 +108,7 @@ public class BleService extends Service {
             disconnect();
             return START_NOT_STICKY;
         }
-        startInForeground("Watch Link", "Ready. Not connected to a watch");
+        startInForeground();
         if (device == null) {
             String saved = prefs().getString("address", null);
             if (saved != null && adapter() != null) connect(saved, null);
@@ -164,7 +164,7 @@ public class BleService extends Service {
         startForegroundService(new Intent(this, BleService.class)); // keep running after the UI closes
         device = a.getRemoteDevice(address);
         prefs().edit().putString("address", address).putString("name", device.getName()).apply();
-        startInForeground(displayName(), "Connecting…");
+        startInForeground();
         gatt = device.connectGatt(this, false, callback, BluetoothDevice.TRANSPORT_LE);
         setState(retries > 0 ? "reconnecting" : "connecting");
     }
@@ -295,7 +295,6 @@ public class BleService extends Service {
                 if (g != gatt) return;
                 if (status != BluetoothGatt.GATT_SUCCESS) { g.disconnect(); return; }
                 ready = true;
-                startInForeground(displayName(), "Connected · music buttons and call alerts active");
                 for (Result r : new ArrayList<>(waitingForConnect)) r.ok(null);
                 waitingForConnect.clear();
                 emit("connected");
@@ -411,7 +410,6 @@ public class BleService extends Service {
     private void scheduleReconnect() {
         long delay = Math.min(30000, 2000L << Math.min(retries, 4));
         retries++;
-        startInForeground(displayName(), "Reconnecting… keep the watch nearby");
         setState("reconnecting");
         String address = device.getAddress();
         main.postDelayed(() -> { if (!userDisconnected && gatt == null) connect(address, null); }, delay);
@@ -444,6 +442,7 @@ public class BleService extends Service {
     private void setState(String s) {
         if (s.equals(state)) return;
         state = s;
+        if (!s.equals("disconnected")) startInForeground(); // the notification always shows this state
         try { emit(state().put("type", "state")); } catch (JSONException ignored) { }
     }
 
@@ -468,8 +467,18 @@ public class BleService extends Service {
         return n != null ? n : "the watch";
     }
 
-    /** The ongoing notification: the watch's name, then its connection status. */
-    private void startInForeground(String title, String text) {
+    /** The ongoing notification, drawn from the connection state: the watch's name, then its status. */
+    private void startInForeground() {
+        boolean on = state.equals("connected");
+        String title = device == null ? "Watch Link" : displayName();
+        String text = on ? "● Connected"
+            : state.equals("connecting") ? "◌ Connecting…"
+            : state.equals("reconnecting") ? "↻ Reconnecting… keep the watch nearby"
+            : "○ Not connected";
+        startInForeground(title, text, on ? "Music and call alerts active" : null);
+    }
+
+    private void startInForeground(String title, String text, String sub) {
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Watch connection", NotificationManager.IMPORTANCE_LOW));
@@ -482,7 +491,7 @@ public class BleService extends Service {
             .setColor(getColor(R.color.brown))
             .setContentTitle(title)
             .setContentText(text)
-            .setSubText("Watch Link")
+            .setSubText(sub)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setShowWhen(false)
             .setContentIntent(open)
