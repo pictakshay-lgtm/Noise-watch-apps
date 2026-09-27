@@ -108,7 +108,7 @@ public class BleService extends Service {
             disconnect();
             return START_NOT_STICKY;
         }
-        startInForeground("Watch Link is ready");
+        startInForeground("Watch Link", "Ready. Not connected to a watch");
         if (device == null) {
             String saved = prefs().getString("address", null);
             if (saved != null && adapter() != null) connect(saved, null);
@@ -164,7 +164,7 @@ public class BleService extends Service {
         startForegroundService(new Intent(this, BleService.class)); // keep running after the UI closes
         device = a.getRemoteDevice(address);
         prefs().edit().putString("address", address).putString("name", device.getName()).apply();
-        startInForeground("Connecting to " + displayName());
+        startInForeground(displayName(), "Connecting…");
         gatt = device.connectGatt(this, false, callback, BluetoothDevice.TRANSPORT_LE);
         setState(retries > 0 ? "reconnecting" : "connecting");
     }
@@ -295,7 +295,7 @@ public class BleService extends Service {
                 if (g != gatt) return;
                 if (status != BluetoothGatt.GATT_SUCCESS) { g.disconnect(); return; }
                 ready = true;
-                startInForeground("Connected to " + displayName());
+                startInForeground(displayName(), "Connected · music buttons and call alerts active");
                 for (Result r : new ArrayList<>(waitingForConnect)) r.ok(null);
                 waitingForConnect.clear();
                 emit("connected");
@@ -411,7 +411,7 @@ public class BleService extends Service {
     private void scheduleReconnect() {
         long delay = Math.min(30000, 2000L << Math.min(retries, 4));
         retries++;
-        startInForeground("Reconnecting to " + displayName() + "…");
+        startInForeground(displayName(), "Reconnecting… keep the watch nearby");
         setState("reconnecting");
         String address = device.getAddress();
         main.postDelayed(() -> { if (!userDisconnected && gatt == null) connect(address, null); }, delay);
@@ -468,7 +468,8 @@ public class BleService extends Service {
         return n != null ? n : "the watch";
     }
 
-    private void startInForeground(String text) {
+    /** The ongoing notification: the watch's name, then its connection status. */
+    private void startInForeground(String title, String text) {
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Watch connection", NotificationManager.IMPORTANCE_LOW));
@@ -477,9 +478,13 @@ public class BleService extends Service {
         PendingIntent stop = PendingIntent.getService(this, 1,
             new Intent(this, BleService.class).setAction(ACTION_DISCONNECT), PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle("Watch Link")
+            .setSmallIcon(R.drawable.ic_stat_watch)
+            .setColor(getColor(R.color.brown))
+            .setContentTitle(title)
             .setContentText(text)
+            .setSubText("Watch Link")
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setShowWhen(false)
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(new Notification.Action.Builder(null, "Disconnect", stop).build())
@@ -504,7 +509,7 @@ public class BleService extends Service {
     boolean incomingCall(String who) {
         if (!ready || gatt == null || gatt.getService(UUID.fromString(MOYOUNG)) == null) return false;
         clearCallButtons();
-        byte[] text = who.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] text = watchText(who).getBytes(java.nio.charset.StandardCharsets.UTF_8);
         int len = Math.min(text.length, 60);
         while (len > 0 && len < text.length && (text[len] & 0xC0) == 0x80) len--; // don't split a character
         byte[] payload = new byte[len + 1];
@@ -512,6 +517,27 @@ public class BleService extends Service {
         System.arraycopy(text, 0, payload, 1, len);
         sendToWatch(CMD_MESSAGE, payload);
         return true;
+    }
+
+    /**
+     * Text the watch can show: one line, no emoji or other characters outside the basic range
+     * (the watch font doesn't have them), at most 60 bytes (cut at a word where possible).
+     */
+    static String watchText(String s) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isSurrogate(c) || Character.getType(c) == Character.OTHER_SYMBOL
+                || (c >= 0xFE00 && c <= 0xFE0F) || c == 0x200D) continue; // emoji, emoji style, joiners
+            b.append(Character.isWhitespace(c) || Character.isISOControl(c) ? ' ' : c);
+        }
+        String t = b.toString().replaceAll(" +", " ").trim();
+        if (t.isEmpty()) return "Incoming call";
+        while (t.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 60) {
+            int cut = t.lastIndexOf(' ');
+            t = (cut > 20 ? t.substring(0, cut) : t.substring(0, t.length() - 1)).trim();
+        }
+        return t;
     }
 
     void callEnded() {

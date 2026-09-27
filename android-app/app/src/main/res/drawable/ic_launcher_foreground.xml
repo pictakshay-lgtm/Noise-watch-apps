@@ -5,19 +5,19 @@
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
     <!-- outer waves -->
-    <path android:strokeColor="#FFFFFFFF" android:strokeAlpha="0.5" android:strokeWidth="3"
+    <path android:strokeColor="#FFF4E04D" android:strokeAlpha="0.5" android:strokeWidth="3"
         android:strokeLineCap="round"
         android:pathData="M34.91,34.91A27,27 0,0 0,34.91 73.09M73.09,34.91A27,27 0,0 1,73.09 73.09" />
     <!-- inner waves -->
-    <path android:strokeColor="#FFFFFFFF" android:strokeAlpha="0.8" android:strokeWidth="3"
+    <path android:strokeColor="#FFF4E04D" android:strokeAlpha="0.8" android:strokeWidth="3"
         android:strokeLineCap="round"
         android:pathData="M39.86,39.86A20,20 0,0 0,39.86 68.14M68.14,39.86A20,20 0,0 1,68.14 68.14" />
     <!-- clock face -->
-    <path android:fillColor="#FFFFFFFF"
+    <path android:fillColor="#FFF4E04D"
         android:pathData="M54,40.5a13.5,13.5 0,1 1,0 27a13.5,13.5 0,1 1,0 -27z" />
     <!-- hands -->
-    <path android:strokeColor="#FF2338B8" android:strokeWidth="2.6" android:strokeLineCap="round"
+    <path android:strokeColor="#FF4A2A12" android:strokeWidth="2.6" android:strokeLineCap="round"
         android:pathData="M54,54L54,45.5M54,54L59.5,57" />
-    <path android:fillColor="#FF2338B8"
+    <path android:fillColor="#FF4A2A12"
         android:pathData="M54,52.2a1.8,1.8 0,1 1,0 3.6a1.8,1.8 0,1 1,0 -3.6z" />
 </vector>

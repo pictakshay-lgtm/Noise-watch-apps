@@ -38,7 +38,7 @@ public class CallReceiver extends BroadcastReceiver {
             } else {
                 if (pending != null) { main.removeCallbacks(pending); pending = null; }
                 String name = contactName(app, number);
-                alert(app, name != null ? name : number);
+                alert(app, name != null ? name : readable(app, number));
             }
         } else {
             // Answered (OFFHOOK) or ended (IDLE): clear the call screen on the watch.
@@ -64,6 +64,16 @@ public class CallReceiver extends BroadcastReceiver {
         BleService s = BleService.instance;
         if (s == null) return;
         alerted = s.incomingCall(who);
+    }
+
+    /** "+919876543210" becomes "+91 98765 43210", in the phone's own country format. */
+    private static String readable(Context app, String number) {
+        String iso = null;
+        TelephonyManager tm = app.getSystemService(TelephonyManager.class);
+        if (tm != null) iso = tm.getNetworkCountryIso();
+        if (iso == null || iso.isEmpty()) iso = java.util.Locale.getDefault().getCountry();
+        String f = android.telephony.PhoneNumberUtils.formatNumber(number, iso.toUpperCase(java.util.Locale.ROOT));
+        return f != null ? f : number;
     }
 
     private static String contactName(Context app, String number) {
