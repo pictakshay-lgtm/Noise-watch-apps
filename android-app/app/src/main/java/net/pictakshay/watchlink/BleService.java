@@ -64,6 +64,14 @@ public class BleService extends Service {
     private static final UUID CCCD = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private static final String MOYOUNG = "0000feea-0000-1000-8000-00805f9b34fb";
     private static final String MOYOUNG_IN = "0000fee3-0000-1000-8000-00805f9b34fb";
+    private static final String MOYOUNG_OUT = "0000fee2-0000-1000-8000-00805f9b34fb";
+    // MoYoung messages (as in Gadgetbridge's DaFit support): CMD 0x41 = notification,
+    // type 0 = incoming call, type 0xFF = call answered/ended.
+    private static final int CMD_MESSAGE = 0x41;
+    private static final int MESSAGE_CALL = 0x00;
+    private static final int MESSAGE_CALL_OFF = 0xFF;
+    /** The running service, so {@link CallReceiver} can reach the watch. */
+    static BleService instance;
     static final String YT_MUSIC = "com.google.android.apps.youtube.music";
     private static final Result IGNORE = new Result() {
         @Override public void ok(Object value) { }
@@ -87,6 +95,11 @@ public class BleService extends Service {
 
     // ---------- lifecycle ----------
 
+    @Override public void onCreate() {
+        super.onCreate();
+        instance = this;
+    }
+
     @Override public IBinder onBind(Intent intent) { return binder; }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -103,6 +116,7 @@ public class BleService extends Service {
     }
 
     @Override public void onDestroy() {
+        if (instance == this) instance = null;
         closeGatt();
         super.onDestroy();
     }
@@ -318,11 +332,13 @@ public class BleService extends Service {
     };
 
     private void notifyChanged(BluetoothGattCharacteristic c, byte[] value) {
-        // Watch music buttons: FE EA 20 06 67 <op>, op 0 = play/pause, 1 = previous, 2 = next.
+        // Watch buttons: FE EA 20 06 67 <op>, op 0 = play/pause, 1 = previous, 2 = next,
+        // 3 = reject the incoming call.
         if (value != null && value.length >= 6 && value[0] == (byte) 0xFE && value[1] == (byte) 0xEA && value[4] == 0x67
                 && c.getUuid().toString().equals(MOYOUNG_IN)) {
             int op = value[5];
             if (op >= 0 && op <= 2) main.post(() -> mediaKey(op));
+            if (op == 3) main.post(this::rejectCall);
         }
         String service = c.getService().getUuid().toString();
         String ch = c.getUuid().toString();
@@ -456,6 +472,48 @@ public class BleService extends Service {
         long t = android.os.SystemClock.uptimeMillis();
         am.dispatchMediaKeyEvent(new android.view.KeyEvent(t, t, android.view.KeyEvent.ACTION_DOWN, key, 0));
         am.dispatchMediaKeyEvent(new android.view.KeyEvent(t, t, android.view.KeyEvent.ACTION_UP, key, 0));
+    }
+
+    // ---------- calls ----------
+
+    /** Shows an incoming call on the watch. Returns false when no watch is connected. */
+    boolean incomingCall(String who) {
+        if (!ready || gatt == null || gatt.getService(UUID.fromString(MOYOUNG)) == null) return false;
+        byte[] text = who.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        int len = Math.min(text.length, 60);
+        while (len > 0 && len < text.length && (text[len] & 0xC0) == 0x80) len--; // don't split a character
+        byte[] payload = new byte[len + 1];
+        payload[0] = (byte) MESSAGE_CALL;
+        System.arraycopy(text, 0, payload, 1, len);
+        sendToWatch(CMD_MESSAGE, payload);
+        return true;
+    }
+
+    void callEnded() {
+        if (ready && gatt != null && gatt.getService(UUID.fromString(MOYOUNG)) != null) {
+            sendToWatch(CMD_MESSAGE, new byte[]{(byte) MESSAGE_CALL_OFF});
+        }
+    }
+
+    /** The watch's reject button. Needs the "Phone" permission (ANSWER_PHONE_CALLS). */
+    @SuppressWarnings("deprecation")
+    void rejectCall() {
+        if (!CallReceiver.isRinging()) return; // only act on a call we're showing
+        if (checkSelfPermission(android.Manifest.permission.ANSWER_PHONE_CALLS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+        try { getSystemService(android.telecom.TelecomManager.class).endCall(); } catch (RuntimeException ignored) { }
+    }
+
+    /** Frames FE EA 20+len>>8 len cmd payload and writes it in MTU-sized pieces, as the watch expects. */
+    private void sendToWatch(int cmd, byte[] payload) {
+        int total = payload.length + 5;
+        byte[] pkt = new byte[total];
+        pkt[0] = (byte) 0xFE; pkt[1] = (byte) 0xEA;
+        pkt[2] = (byte) (0x20 + (total >> 8)); pkt[3] = (byte) total; pkt[4] = (byte) cmd;
+        System.arraycopy(payload, 0, pkt, 5, payload.length);
+        int step = mtu - 3;
+        for (int i = 0; i < total; i += step) {
+            write(MOYOUNG, MOYOUNG_OUT, java.util.Arrays.copyOfRange(pkt, i, Math.min(total, i + step)), false, IGNORE);
+        }
     }
 
     private BluetoothManager manager() { return (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE); }
