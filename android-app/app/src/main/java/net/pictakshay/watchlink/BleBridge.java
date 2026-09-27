@@ -113,7 +113,8 @@ public class BleBridge {
                 case "startNotifications": service.setNotify(a.getString("service"), a.getString("char"), true, result); break;
                 case "testCall":
                     if (!service.incomingCall("Watch Link test call")) { result.fail("NetworkError", "Connect the watch first."); break; }
-                    main.postDelayed(service::callEnded, 6000);
+                    CallReceiver.startTest(10000);
+                    main.postDelayed(() -> { CallReceiver.endTest(); service.callEnded(); }, 10000);
                     result.ok(null);
                     break;
                 case "stopNotifications": service.setNotify(a.getString("service"), a.getString("char"), false, result); break;
@@ -129,7 +130,8 @@ public class BleBridge {
             .put("on", prefs().getBoolean("calls", false) && activity.hasCallPermission())
             .put("names", activity.granted(android.Manifest.permission.READ_CALL_LOG)
                 && activity.granted(android.Manifest.permission.READ_CONTACTS))
-            .put("reject", activity.granted(android.Manifest.permission.ANSWER_PHONE_CALLS));
+            .put("reject", activity.granted(android.Manifest.permission.ANSWER_PHONE_CALLS))
+            .put("buttons", service == null ? "" : service.callButtons());
     }
 
     private android.content.SharedPreferences prefs() {

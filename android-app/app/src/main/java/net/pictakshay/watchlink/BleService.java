@@ -332,13 +332,17 @@ public class BleService extends Service {
     };
 
     private void notifyChanged(BluetoothGattCharacteristic c, byte[] value) {
-        // Watch buttons: FE EA 20 06 67 <op>, op 0 = play/pause, 1 = previous, 2 = next,
-        // 3 = reject the incoming call.
-        if (value != null && value.length >= 6 && value[0] == (byte) 0xFE && value[1] == (byte) 0xEA && value[4] == 0x67
+        // Watch buttons: FE EA 20 06 67 <op>. While a call rings they only answer or reject it:
+        // op 3 rejects, any other button answers. Otherwise op 0 = play/pause, 1 = previous, 2 = next.
+        if (value != null && value.length >= 6 && value[0] == (byte) 0xFE && value[1] == (byte) 0xEA
                 && c.getUuid().toString().equals(MOYOUNG_IN)) {
-            int op = value[5];
-            if (op >= 0 && op <= 2) main.post(() -> mediaKey(op));
-            if (op == 3) main.post(this::rejectCall);
+            boolean ringing = CallReceiver.isRinging();
+            int cmd = value[4] & 0xFF, op = value[5] & 0xFF;
+            if (ringing) main.post(() -> rememberCallButton(value));
+            if (cmd == 0x67) {
+                if (ringing) main.post(op == 3 ? this::rejectCall : this::answerCall);
+                else if (op <= 2) main.post(() -> mediaKey(op));
+            }
         }
         String service = c.getService().getUuid().toString();
         String ch = c.getUuid().toString();
@@ -479,6 +483,7 @@ public class BleService extends Service {
     /** Shows an incoming call on the watch. Returns false when no watch is connected. */
     boolean incomingCall(String who) {
         if (!ready || gatt == null || gatt.getService(UUID.fromString(MOYOUNG)) == null) return false;
+        clearCallButtons();
         byte[] text = who.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         int len = Math.min(text.length, 60);
         while (len > 0 && len < text.length && (text[len] & 0xC0) == 0x80) len--; // don't split a character
@@ -498,10 +503,34 @@ public class BleService extends Service {
     /** The watch's reject button. Needs the "Phone" permission (ANSWER_PHONE_CALLS). */
     @SuppressWarnings("deprecation")
     void rejectCall() {
-        if (!CallReceiver.isRinging()) return; // only act on a call we're showing
-        if (checkSelfPermission(android.Manifest.permission.ANSWER_PHONE_CALLS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+        if (!CallReceiver.isRinging() || !canManageCalls()) return; // only act on a call we're showing
         try { getSystemService(android.telecom.TelecomManager.class).endCall(); } catch (RuntimeException ignored) { }
     }
+
+    /** The watch's answer button: picks up on the phone (audio stays on the phone). */
+    void answerCall() {
+        if (!CallReceiver.isRinging() || !canManageCalls()) return;
+        try { getSystemService(android.telecom.TelecomManager.class).acceptRingingCall(); } catch (RuntimeException ignored) { }
+    }
+
+    private boolean canManageCalls() {
+        return checkSelfPermission(android.Manifest.permission.ANSWER_PHONE_CALLS) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** Keeps what the watch sent during the last call, so the Calls card can show it. */
+    private void rememberCallButton(byte[] value) {
+        StringBuilder hex = new StringBuilder();
+        for (int i = 4; i < value.length; i++) hex.append(String.format("%02X ", value[i]));
+        String line = hex.toString().trim();
+        String prev = prefs().getString("callButtons", "");
+        String all = prev.isEmpty() ? line : prev + ", " + line;
+        prefs().edit().putString("callButtons", all.length() > 120 ? all.substring(all.length() - 120) : all).apply();
+    }
+
+    /** A new call starts with a clean record of watch buttons. */
+    void clearCallButtons() { prefs().edit().remove("callButtons").apply(); }
+
+    String callButtons() { return prefs().getString("callButtons", ""); }
 
     /** Frames FE EA 20+len>>8 len cmd payload and writes it in MTU-sized pieces, as the watch expects. */
     private void sendToWatch(int cmd, byte[] payload) {
