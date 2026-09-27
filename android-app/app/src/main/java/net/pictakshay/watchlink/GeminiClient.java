@@ -132,7 +132,8 @@ final class GeminiClient {
                 .put("system_instruction", new JSONObject().put("parts", new JSONArray().put(new JSONObject().put("text", INSTRUCTION))))
                 .put("contents", new JSONArray().put(new JSONObject().put("role", "user")
                     .put("parts", new JSONArray().put(new JSONObject().put("text", question)))))
-                .put("generationConfig", new JSONObject().put("maxOutputTokens", 600));
+                // Room for the model's thinking (often 600+ tokens) plus the short answer.
+                .put("generationConfig", new JSONObject().put("maxOutputTokens", 2048));
             try (OutputStream out = http.getOutputStream()) { out.write(body.toString().getBytes(StandardCharsets.UTF_8)); }
 
             int code = http.getResponseCode();
@@ -145,12 +146,16 @@ final class GeminiClient {
             if (code >= 400) throw new Friendly("Gemini returned an error (" + code + "). Try again.");
 
             JSONArray candidates = new JSONObject(reply).optJSONArray("candidates");
-            JSONObject content = candidates == null || candidates.length() == 0 ? null : candidates.getJSONObject(0).optJSONObject("content");
+            JSONObject first = candidates == null || candidates.length() == 0 ? null : candidates.getJSONObject(0);
+            JSONObject content = first == null ? null : first.optJSONObject("content");
             JSONArray parts = content == null ? null : content.optJSONArray("parts");
             StringBuilder text = new StringBuilder();
             for (int i = 0; parts != null && i < parts.length(); i++) text.append(parts.getJSONObject(i).optString("text"));
             if (text.length() == 0) throw new Friendly("Gemini didn't return an answer. Try rephrasing the question.");
-            return text.toString().trim();
+            String answer = text.toString().trim();
+            // Still cut off by the length limit: say so instead of stopping mid-sentence.
+            if ("MAX_TOKENS".equals(first.optString("finishReason"))) answer += "…";
+            return answer;
         } finally {
             http.disconnect();
         }
