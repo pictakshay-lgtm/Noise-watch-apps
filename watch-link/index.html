@@ -632,7 +632,7 @@ async function measureHr() {
     inn.addEventListener("characteristicvaluechanged", onPacket);
     await inn.startNotifications();
     await send([0xfe, 0xea, 0x20, 0x06, 0x6d, 0x00]);
-    timer = setTimeout(() => finish("No reading from the watch after 60 seconds. Send a screenshot of the event log below."), 60000);
+    timer = setTimeout(() => finish("No reading from the watch after 60 seconds. Send a screenshot of the raw log (More → Advanced)."), 60000);
   } catch (e) {
     finish(`Couldn't start a measurement: ${errorText(e)}`);
   }
@@ -917,7 +917,7 @@ async function uploadFace() {
     const checksum = await up.start();
     if (checksum == null) {
       log("info", FEE(3), null, `face pushed without confirmation (${heard} replies from the watch)`);
-      msg(`Sent ${faceName}, but the watch never confirmed it (${heard} replies). Look at the watch: if the face didn't change, it doesn't accept uploads this way. The event log below shows what it answered.`);
+      msg(`Sent ${faceName}, but the watch never confirmed it (${heard} replies). Look at the watch: if the face didn't change, it doesn't accept uploads this way. The raw log under Advanced shows what it answered.`);
     } else {
       log("info", FEE(3), null, `face upload finished, watch checksum ${checksum.toString(16)}`);
       msg(`Done. The watch received ${faceName} (checksum ${checksum.toString(16)}) and should now show it. If it doesn't, pick the gallery / custom face on the watch.`);
@@ -927,7 +927,7 @@ async function uploadFace() {
     const hint = /stopped responding/.test(errorText(e)) && $("packetSize").value === "244"
       ? " If this is an iPad or iPhone, set Packet size to 180 and try again."
       : /length|size|GATT/i.test(errorText(e)) ? " Try a smaller Packet size, or the dawfu tool on a laptop." : "";
-    msg(`Upload failed: ${errorText(e)}${hint} The watch replied ${heard} time(s); see the event log below.`);
+    msg(`Upload failed: ${errorText(e)}${hint} The watch replied ${heard} time(s); see the raw log under Advanced.`);
   } finally {
     if (notify && onNotify) notify.removeEventListener("characteristicvaluechanged", onNotify);
     uploading = false; refreshUpload(); setBusy(!!device?.gatt?.connected);
