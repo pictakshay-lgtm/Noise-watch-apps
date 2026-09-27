@@ -48,7 +48,7 @@ h1{font-size:21px;font-weight:700;letter-spacing:-.01em}
 @keyframes blink{50%{opacity:.25}}
 .tabpanel{display:grid;gap:16px}
 .tabpanel[hidden]{display:none}
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
 .tabs button{display:grid;justify-items:center;gap:3px;border:0;background:none;border-radius:14px;padding:6px 4px;font:600 11.5px var(--body);color:var(--muted);min-height:var(--tabbar)}
 .tabs svg{width:24px;height:24px;padding:3px 14px;box-sizing:content-box;border-radius:999px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tabs [aria-selected="true"]{color:var(--ink)}
@@ -213,6 +213,14 @@ html:not(.no-hr) #hrEmpty,html.measuring #hrEmpty{display:none}
 .callstate i{box-sizing:border-box;width:12px;height:12px;border-radius:50%;border:2px solid var(--muted);flex:none}
 .callstate.on i{background:var(--good);border-color:var(--good)}
 /* motion: only to show state; off when the phone asks for less motion */
+textarea{font:400 15px/1.45 var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%;resize:vertical;min-height:84px}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.errtext{font-size:13.5px;color:var(--bad)}
+.errtext[hidden],.answerbox[hidden],.sect[hidden]{display:none}
+.answerbox{display:grid;gap:8px;background:var(--sunk);border-radius:14px;padding:12px 14px}
+.answershort{font:650 16px/1.35 var(--display)}
+.answer{white-space:pre-wrap;font-size:14.5px}
+@media (max-width:360px){.tabs button{font-size:10.5px}.tabs svg{padding:3px 10px}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadein{from{opacity:0;transform:translateY(4px)}}
 .tabpanel:not([hidden]){animation:fadein .18s ease}
@@ -237,6 +245,7 @@ li{margin:3px 0}
   <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></symbol>
   <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.6 4h2.7l1.4 4-1.9 1.3a11 11 0 0 0 5.9 5.9l1.3-1.9 4 1.4v2.7A1.6 1.6 0 0 1 18.4 19 14.4 14.4 0 0 1 5 5.6 1.6 1.6 0 0 1 6.6 4z"/></symbol>
   <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></symbol>
 </svg>
 
@@ -379,6 +388,37 @@ li{margin:3px 0}
   </section>
   </div>
 
+  <!-- ===== Ask (Gemini) ===== -->
+  <div class="tabpanel" role="tabpanel" id="p-ask" aria-labelledby="t-ask" hidden>
+  <h2 class="screen">Ask</h2>
+  <section class="panel" aria-labelledby="askH">
+    <div class="whead">
+      <div class="wicon" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-spark"/></svg></div>
+      <div class="wname"><h3 id="askH">Ask Gemini</h3><p class="muted small">Answers show here, and a short version on your watch.</p></div>
+    </div>
+    <div class="sect" id="askSetup" hidden>
+      <p class="muted small">Add your own Gemini API key to use Ask. Get one free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. It's stored encrypted on this phone and used only when you ask something.</p>
+      <label>Gemini API key <input id="askKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key"></label>
+      <button type="button" class="primary" id="askSaveKey">Save key</button>
+      <p class="errtext" id="askKeyErr" role="alert" hidden></p>
+    </div>
+    <div class="sect" id="askMain" hidden>
+      <label class="visually-hidden" for="askQ">Your question</label>
+      <textarea id="askQ" rows="3" maxlength="2000" placeholder="Ask anything, like: what's a healthy resting heart rate?"></textarea>
+      <button type="button" class="primary" id="askBtn">Ask</button>
+      <div class="state" id="askThinking" hidden><span class="spinner" aria-hidden="true"></span><b>Thinking…</b></div>
+      <p class="errtext" id="askErr" role="alert" hidden></p>
+      <div class="answerbox" id="askAnswer" hidden aria-live="polite">
+        <p class="answershort" id="askShort"></p>
+        <p class="answer" id="askText"></p>
+        <p class="muted small" id="askWatch"></p>
+      </div>
+      <div class="foot"><p class="muted small">Only the question you type is sent to Google Gemini.</p><button type="button" class="text" id="askForget">Remove key</button></div>
+    </div>
+    <p class="muted" id="askWeb" hidden>Ask works in the Health Watcher Android app.</p>
+  </section>
+  </div>
+
   <!-- ===== More ===== -->
   <div class="tabpanel" role="tabpanel" id="p-more" aria-labelledby="t-more" hidden>
   <h2 class="screen">More</h2>
@@ -474,13 +514,14 @@ li{margin:3px 0}
     <button type="button" role="tab" id="t-home" aria-controls="p-home" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>Home</button>
     <button type="button" role="tab" id="t-music" aria-controls="p-music" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>Music</button>
     <button type="button" role="tab" id="t-calls" aria-controls="p-calls" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 4h2.7l1.4 4-1.9 1.3a11 11 0 0 0 5.9 5.9l1.3-1.9 4 1.4v2.7A1.6 1.6 0 0 1 18.4 19 14.4 14.4 0 0 1 5 5.6 1.6 1.6 0 0 1 6.6 4z"/></svg>Calls</button>
+    <button type="button" role="tab" id="t-ask" aria-controls="p-ask" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>Ask</button>
     <button type="button" role="tab" id="t-more" aria-controls="p-more" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg>More</button>
   </nav>
 </div>
 
 <script>
 (function () {
-  var tabs = ["home", "music", "calls", "more"], scroll = {}, current = null;
+  var tabs = ["home", "music", "calls", "ask", "more"], scroll = {}, current = null;
   function show(name, remember) {
     if (tabs.indexOf(name) < 0) name = "home";
     if (current) scroll[current] = window.scrollY;
@@ -722,6 +763,57 @@ if (window.watchLinkNative) {
 } else {
   $("musicNote").textContent = "Music controls work in the Health Watcher Android app.";
   document.querySelectorAll("#ytBtn, [data-key]").forEach(b => b.disabled = true);
+}
+
+// ---------- Ask Gemini (Android app only) ----------
+// The key and the request live in the app (GeminiClient.java); the page never sees the key.
+function watchText(s, max = 100) {   // one line, no emoji, fits the watch
+  let t = s.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\uFE00-\uFE0F\u200D]/gu, "").replace(/\s+/g, " ").trim();
+  const enc = new TextEncoder();
+  while (enc.encode(t).length > max) { const cut = t.lastIndexOf(" "); t = (cut > 20 ? t.slice(0, cut) : t.slice(0, -1)).trim(); }
+  return t;
+}
+function splitAnswer(text) {
+  const lines = text.split(/\n/), short = lines[0].replace(/^(short|watch|answer)\s*:\s*/i, "").trim();
+  return { short, full: lines.slice(1).join("\n").trim() };
+}
+if (window.watchLinkNative) {
+  const showAsk = st => { $("askSetup").hidden = !!st.hasKey; $("askMain").hidden = !st.hasKey; };
+  window.watchLinkNative("aiStatus").then(showAsk).catch(() => showAsk({ hasKey: false }));
+  $("askSaveKey").onclick = async () => {
+    $("askKeyErr").hidden = true;
+    try { const st = await window.watchLinkNative("aiSetKey", { key: $("askKey").value }); $("askKey").value = ""; showAsk(st); }
+    catch (e) { $("askKeyErr").textContent = e.message; $("askKeyErr").hidden = false; }
+  };
+  $("askForget").onclick = async () => { $("askAnswer").hidden = true; showAsk(await window.watchLinkNative("aiClearKey")); };
+  $("askBtn").onclick = async () => {
+    const q = $("askQ").value.trim();
+    if (!q) { $("askQ").focus(); return; }
+    $("askErr").hidden = true; $("askAnswer").hidden = true;
+    $("askBtn").disabled = true; $("askThinking").hidden = false;
+    try {
+      const r = await window.watchLinkNative("aiAsk", { q });
+      const a = splitAnswer(r.text);
+      $("askShort").textContent = a.short; $("askText").textContent = a.full;
+      $("askText").hidden = !a.full;
+      $("askWatch").textContent = "";
+      $("askAnswer").hidden = false;
+      const line = watchText(a.short);
+      if (device?.gatt?.connected && line) {
+        // MoYoung notification (0x41); type 1 shows it as a message on the watch.
+        try { await moyoung(0x41, [1, ...new TextEncoder().encode(line)], 300); $("askWatch").textContent = "Sent to your watch."; }
+        catch (e) { $("askWatch").textContent = "Couldn't send it to the watch."; }
+      } else {
+        $("askWatch").textContent = "Connect your watch to see answers there too.";
+      }
+    } catch (e) {
+      $("askErr").textContent = e.message || "Something went wrong."; $("askErr").hidden = false;
+    } finally {
+      $("askBtn").disabled = false; $("askThinking").hidden = true;
+    }
+  };
+} else {
+  $("askWeb").hidden = false;
 }
 
 // ---------- colours ----------

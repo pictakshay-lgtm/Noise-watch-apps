@@ -84,6 +84,28 @@ public class BleBridge {
                 return;
             }
             if (method.equals("state")) { result.ok(service.state()); return; }
+            // Ask Gemini (your own key, stored encrypted on the phone; the page never gets it back).
+            if (method.equals("aiStatus")) { result.ok(new JSONObject().put("hasKey", GeminiClient.hasKey(activity))); return; }
+            if (method.equals("aiSetKey")) {
+                String key = a.optString("key").trim();
+                if (key.length() < 20 || key.contains(" ")) { result.fail("TypeError", "That doesn't look like a Gemini API key."); return; }
+                try { GeminiClient.saveKey(activity, key); } catch (Exception e) { result.fail("SecurityError", "Couldn't store the key on this phone."); return; }
+                result.ok(new JSONObject().put("hasKey", true));
+                return;
+            }
+            if (method.equals("aiClearKey")) { GeminiClient.clearKey(activity); result.ok(new JSONObject().put("hasKey", false)); return; }
+            if (method.equals("aiAsk")) {
+                String q = a.optString("q").trim();
+                if (q.isEmpty()) { result.fail("TypeError", "Type a question first."); return; }
+                if (q.length() > 2000) q = q.substring(0, 2000);
+                GeminiClient.ask(activity, q, new GeminiClient.Done() {
+                    @Override public void ok(String text) {
+                        try { result.ok(new JSONObject().put("text", text)); } catch (JSONException e) { result.fail("TypeError", e.getMessage()); }
+                    }
+                    @Override public void fail(String message) { result.fail("AiError", message); }
+                });
+                return;
+            }
             if (method.equals("callStatus")) { result.ok(callStatus()); return; }
             if (method.equals("setCalls")) {
                 if (!a.optBoolean("on")) { prefs().edit().putBoolean("calls", false).apply(); result.ok(callStatus()); return; }
