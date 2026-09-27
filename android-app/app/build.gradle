@@ -5,9 +5,14 @@ plugins {
 def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
 // Built-in Gemini key for Ask, from the GEMINI_API_KEY build secret (empty when not set). Only
 // key-safe characters are accepted so the value can't break out of the generated Java string.
-// Trimmed: a key pasted into GitHub secrets often carries a trailing space or newline.
+// Tidied first: pasted secrets often carry spaces/newlines, surrounding quotes or a NAME= prefix.
 def geminiKey = (System.getenv("GEMINI_API_KEY") ?: "").trim()
-if (!(geminiKey ==~ /[A-Za-z0-9._-]*/)) geminiKey = ""
+geminiKey = geminiKey.replaceFirst(/^[A-Za-z_]+=/, "").trim()
+if (geminiKey.length() >= 2 && (geminiKey[0] == '"' || geminiKey[0] == "'") && geminiKey[-1] == geminiKey[0]) geminiKey = geminiKey[1..-2].trim()
+// Log only whether a key was built in and its length, never the key itself.
+if (geminiKey.isEmpty()) println "Gemini built-in key: not set"
+else if (!(geminiKey ==~ /[A-Za-z0-9._-]+/)) { println "Gemini built-in key: rejected (${geminiKey.length()} chars; contains characters other than letters, digits, . _ -)"; geminiKey = "" }
+else println "Gemini built-in key: built in (${geminiKey.length()} chars)"
 
 android {
     namespace 'net.pictakshay.watchlink'
