@@ -94,7 +94,7 @@ public class BleBridge {
                 return;
             }
             if (!activity.hasBluetoothPermissions() && !method.equals("availability")) {
-                result.fail("SecurityError", "Allow Watch Link to use Bluetooth (Nearby devices) in Android settings.");
+                result.fail("SecurityError", "Allow Health Watcher to use Bluetooth (Nearby devices) in Android settings.");
                 return;
             }
             switch (method) {
@@ -113,7 +113,7 @@ public class BleBridge {
                     break;
                 case "startNotifications": service.setNotify(a.getString("service"), a.getString("char"), true, result); break;
                 case "testCall":
-                    if (!service.incomingCall("Watch Link test call")) { result.fail("NetworkError", "Connect the watch first."); break; }
+                    if (!service.incomingCall("Health Watcher test call")) { result.fail("NetworkError", "Connect the watch first."); break; }
                     CallReceiver.startTest(10000);
                     main.postDelayed(() -> { CallReceiver.endTest(); service.callEnded(); }, 10000);
                     result.ok(null);
