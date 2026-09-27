@@ -85,15 +85,15 @@ public class BleBridge {
             }
             if (method.equals("state")) { result.ok(service.state()); return; }
             // Ask Gemini (your own key, stored encrypted on the phone; the page never gets it back).
-            if (method.equals("aiStatus")) { result.ok(new JSONObject().put("hasKey", GeminiClient.hasKey(activity))); return; }
+            if (method.equals("aiStatus")) { result.ok(aiStatus()); return; }
             if (method.equals("aiSetKey")) {
                 String key = a.optString("key").trim();
                 if (key.length() < 20 || key.contains(" ")) { result.fail("TypeError", "That doesn't look like a Gemini API key."); return; }
                 try { GeminiClient.saveKey(activity, key); } catch (Exception e) { result.fail("SecurityError", "Couldn't store the key on this phone."); return; }
-                result.ok(new JSONObject().put("hasKey", true));
+                result.ok(aiStatus());
                 return;
             }
-            if (method.equals("aiClearKey")) { GeminiClient.clearKey(activity); result.ok(new JSONObject().put("hasKey", false)); return; }
+            if (method.equals("aiClearKey")) { GeminiClient.clearKey(activity); result.ok(aiStatus()); return; }
             if (method.equals("aiAsk")) {
                 String q = a.optString("q").trim();
                 if (q.isEmpty()) { result.fail("TypeError", "Type a question first."); return; }
@@ -155,6 +155,11 @@ public class BleBridge {
                 && activity.granted(android.Manifest.permission.READ_CONTACTS))
             .put("reject", activity.granted(android.Manifest.permission.ANSWER_PHONE_CALLS))
             .put("buttons", service == null ? "" : service.callButtons());
+    }
+
+    /** hasKey: Ask can be used; ownKey: the user saved one on this phone (else the built-in key). */
+    private JSONObject aiStatus() throws JSONException {
+        return new JSONObject().put("hasKey", GeminiClient.hasKey(activity)).put("ownKey", GeminiClient.hasOwnKey(activity));
     }
 
     private android.content.SharedPreferences prefs() {
