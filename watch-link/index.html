@@ -413,7 +413,7 @@ li{margin:3px 0}
         <p class="answer" id="askText"></p>
         <p class="muted small" id="askWatch"></p>
       </div>
-      <div class="foot"><p class="muted small">Only the question you type is sent to Google Gemini.</p><button type="button" class="text" id="askForget">Remove key</button></div>
+      <div class="foot"><p class="muted small" id="askKeyNote">Only the question you type is sent to Google Gemini.</p><button type="button" class="text" id="askForget">Remove key</button></div>
     </div>
     <p class="muted" id="askWeb" hidden>Ask works in the Health Watcher Android app.</p>
   </section>
@@ -778,7 +778,12 @@ function splitAnswer(text) {
   return { short, full: lines.slice(1).join("\n").trim() };
 }
 if (window.watchLinkNative) {
-  const showAsk = st => { $("askSetup").hidden = !!st.hasKey; $("askMain").hidden = !st.hasKey; };
+  const showAsk = st => {
+    $("askSetup").hidden = !!st.hasKey; $("askMain").hidden = !st.hasKey;
+    // With only the built-in key there's nothing of yours to remove.
+    $("askForget").hidden = !st.ownKey;
+    $("askKeyNote").textContent = "Only the question you type is sent to Google Gemini." + (st.hasKey && !st.ownKey ? " Using the app's built-in key." : "");
+  };
   window.watchLinkNative("aiStatus").then(showAsk).catch(() => showAsk({ hasKey: false }));
   $("askSaveKey").onclick = async () => {
     $("askKeyErr").hidden = true;

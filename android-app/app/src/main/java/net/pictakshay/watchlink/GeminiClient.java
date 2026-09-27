@@ -56,7 +56,13 @@ final class GeminiClient {
 
     private GeminiClient() { }
 
-    static boolean hasKey(Context c) { return prefs(c).contains(KEY_PREF); }
+    /** A key the user saved on this phone. */
+    static boolean hasOwnKey(Context c) { return prefs(c).contains(KEY_PREF); }
+
+    /** A key built into this APK from the GEMINI_API_KEY build secret (empty if none). */
+    static boolean hasBuiltInKey() { return !BuildConfig.GEMINI_DEFAULT_KEY.isEmpty(); }
+
+    static boolean hasKey(Context c) { return hasOwnKey(c) || hasBuiltInKey(); }
 
     static void clearKey(Context c) { prefs(c).edit().remove(KEY_PREF).apply(); }
 
@@ -162,7 +168,7 @@ final class GeminiClient {
 
     private static String loadKey(Context c) throws Exception {
         String stored = prefs(c).getString(KEY_PREF, null);
-        if (stored == null) return null;
+        if (stored == null) return hasBuiltInKey() ? BuildConfig.GEMINI_DEFAULT_KEY : null;
         byte[] all = Base64.decode(stored, Base64.NO_WRAP);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.DECRYPT_MODE, secret(), new GCMParameterSpec(128, all, 0, 12));

@@ -24,6 +24,9 @@ jobs:
 
       - name: Build APK
         working-directory: android-app
+        env:
+          # Optional built-in Gemini key for Ask (repo Settings > Secrets > Actions). Never in the code.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
