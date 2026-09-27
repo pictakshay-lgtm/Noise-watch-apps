@@ -83,6 +83,15 @@ public class BleBridge {
                 result.ok(null);
                 return;
             }
+            if (method.equals("callStatus")) { result.ok(callStatus()); return; }
+            if (method.equals("setCalls")) {
+                if (!a.optBoolean("on")) { prefs().edit().putBoolean("calls", false).apply(); result.ok(callStatus()); return; }
+                activity.requestCallPermissions(() -> {
+                    prefs().edit().putBoolean("calls", activity.hasCallPermission()).apply();
+                    try { result.ok(callStatus()); } catch (JSONException e) { result.fail("TypeError", e.getMessage()); }
+                });
+                return;
+            }
             if (!activity.hasBluetoothPermissions() && !method.equals("availability")) {
                 result.fail("SecurityError", "Allow Watch Link to use Bluetooth (Nearby devices) in Android settings.");
                 return;
@@ -102,12 +111,29 @@ public class BleBridge {
                         Base64.decode(a.getString("value"), Base64.NO_WRAP), a.optBoolean("withResponse"), result);
                     break;
                 case "startNotifications": service.setNotify(a.getString("service"), a.getString("char"), true, result); break;
+                case "testCall":
+                    if (!service.incomingCall("Watch Link test call")) { result.fail("NetworkError", "Connect the watch first."); break; }
+                    main.postDelayed(service::callEnded, 6000);
+                    result.ok(null);
+                    break;
                 case "stopNotifications": service.setNotify(a.getString("service"), a.getString("char"), false, result); break;
                 default: result.fail("NotSupportedError", "Unknown method " + method);
             }
         } catch (JSONException | IllegalArgumentException e) {
             result.fail("TypeError", String.valueOf(e.getMessage()));
         }
+    }
+
+    private JSONObject callStatus() throws JSONException {
+        return new JSONObject()
+            .put("on", prefs().getBoolean("calls", false) && activity.hasCallPermission())
+            .put("names", activity.granted(android.Manifest.permission.READ_CALL_LOG)
+                && activity.granted(android.Manifest.permission.READ_CONTACTS))
+            .put("reject", activity.granted(android.Manifest.permission.ANSWER_PHONE_CALLS));
+    }
+
+    private android.content.SharedPreferences prefs() {
+        return activity.getSharedPreferences("watchlink", Context.MODE_PRIVATE);
     }
 
     // ---------- device picker ----------

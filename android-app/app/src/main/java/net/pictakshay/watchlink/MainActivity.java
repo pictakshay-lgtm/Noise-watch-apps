@@ -40,10 +40,12 @@ public class MainActivity extends Activity {
     static final String ORIGIN = "https://appassets.androidplatform.net";
     static final String START_PAGE = ORIGIN + "/assets/watch-link/index.html";
     private static final int PERMISSION_REQUEST = 1;
+    private static final int CALL_PERMISSION_REQUEST = 2;
 
     private WebView web;
     private BleBridge bridge;
     private BleService service;
+    private Runnable afterCallPermissions;
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder binder) {
@@ -184,6 +186,33 @@ public class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(code, permissions, results);
         if (code == PERMISSION_REQUEST && hasBluetoothPermissions()) startWatchService();
+        if (code == CALL_PERMISSION_REQUEST && afterCallPermissions != null) {
+            Runnable r = afterCallPermissions;
+            afterCallPermissions = null;
+            r.run();
+        }
+    }
+
+    boolean granted(String permission) {
+        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** Call alerts need to know the phone is ringing; the rest (name, reject) is optional. */
+    boolean hasCallPermission() { return granted(Manifest.permission.READ_PHONE_STATE); }
+
+    /** Asks for the call permissions, then runs {@code then} whatever the answer. */
+    void requestCallPermissions(Runnable then) {
+        String[] wanted = {
+            Manifest.permission.READ_PHONE_STATE,   // know a call is ringing
+            Manifest.permission.READ_CALL_LOG,      // the caller's number
+            Manifest.permission.READ_CONTACTS,      // turn the number into a name
+            Manifest.permission.ANSWER_PHONE_CALLS, // reject from the watch
+        };
+        List<String> missing = new ArrayList<>();
+        for (String p : wanted) if (!granted(p)) missing.add(p);
+        if (missing.isEmpty()) { then.run(); return; }
+        afterCallPermissions = then;
+        requestPermissions(missing.toArray(new String[0]), CALL_PERMISSION_REQUEST);
     }
 
     /** Starts the service in the foreground; it reconnects to the last watch on its own. */

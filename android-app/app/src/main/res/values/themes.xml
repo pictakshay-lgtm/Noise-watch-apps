@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light by default; values-night switches to dark when the phone is in dark mode. The
+         WebView reports this theme to the page as prefers-color-scheme. -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#F3F5F8</item>
+        <item name="android:statusBarColor">#F3F5F8</item>
+        <item name="android:navigationBarColor">#F3F5F8</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
