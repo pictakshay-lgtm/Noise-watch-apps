@@ -5,7 +5,8 @@ plugins {
 def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
 // Built-in Gemini key for Ask, from the GEMINI_API_KEY build secret (empty when not set). Only
 // key-safe characters are accepted so the value can't break out of the generated Java string.
-def geminiKey = System.getenv("GEMINI_API_KEY") ?: ""
+// Trimmed: a key pasted into GitHub secrets often carries a trailing space or newline.
+def geminiKey = (System.getenv("GEMINI_API_KEY") ?: "").trim()
 if (!(geminiKey ==~ /[A-Za-z0-9._-]*/)) geminiKey = ""
 
 android {
