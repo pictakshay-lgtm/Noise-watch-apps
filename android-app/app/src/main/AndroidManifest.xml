@@ -19,6 +19,11 @@
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
+    <!-- So the app can open YouTube Music (Android 11+ package visibility). -->
+    <queries>
+        <package android:name="com.google.android.apps.youtube.music" />
+    </queries>
+
     <application
         android:label="Watch Link"
         android:icon="@android:drawable/stat_sys_data_bluetooth"

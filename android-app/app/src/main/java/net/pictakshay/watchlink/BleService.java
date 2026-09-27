@@ -62,6 +62,13 @@ public class BleService extends Service {
     private static final int NOTIFICATION_ID = 1;
     private static final String PREFS = "watchlink";
     private static final UUID CCCD = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+    private static final String MOYOUNG = "0000feea-0000-1000-8000-00805f9b34fb";
+    private static final String MOYOUNG_IN = "0000fee3-0000-1000-8000-00805f9b34fb";
+    static final String YT_MUSIC = "com.google.android.apps.youtube.music";
+    private static final Result IGNORE = new Result() {
+        @Override public void ok(Object value) { }
+        @Override public void fail(String name, String message) { }
+    };
     static final String ACTION_DISCONNECT = "net.pictakshay.watchlink.DISCONNECT";
 
     private final IBinder binder = new LocalBinder();
@@ -274,6 +281,8 @@ public class BleService extends Service {
                 for (Result r : new ArrayList<>(waitingForConnect)) r.ok(null);
                 waitingForConnect.clear();
                 emit("connected");
+                // Listen for the watch's music buttons even when the page isn't open.
+                if (g.getService(UUID.fromString(MOYOUNG)) != null) setNotify(MOYOUNG, MOYOUNG_IN, true, IGNORE);
             });
         }
 
@@ -309,6 +318,12 @@ public class BleService extends Service {
     };
 
     private void notifyChanged(BluetoothGattCharacteristic c, byte[] value) {
+        // Watch music buttons: FE EA 20 06 67 <op>, op 0 = play/pause, 1 = previous, 2 = next.
+        if (value != null && value.length >= 6 && value[0] == (byte) 0xFE && value[1] == (byte) 0xEA && value[4] == 0x67
+                && c.getUuid().toString().equals(MOYOUNG_IN)) {
+            int op = value[5];
+            if (op >= 0 && op <= 2) main.post(() -> mediaKey(op));
+        }
         String service = c.getService().getUuid().toString();
         String ch = c.getUuid().toString();
         String b64 = Base64.encodeToString(value, Base64.NO_WRAP);
@@ -431,6 +446,16 @@ public class BleService extends Service {
             .build();
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
         else startForeground(NOTIFICATION_ID, n);
+    }
+
+    /** Presses a media key; Android sends it to whatever is playing (YouTube Music, Spotify, …). */
+    void mediaKey(int op) {
+        int key = op == 2 ? android.view.KeyEvent.KEYCODE_MEDIA_NEXT
+            : op == 1 ? android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS : android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
+        android.media.AudioManager am = getSystemService(android.media.AudioManager.class);
+        long t = android.os.SystemClock.uptimeMillis();
+        am.dispatchMediaKeyEvent(new android.view.KeyEvent(t, t, android.view.KeyEvent.ACTION_DOWN, key, 0));
+        am.dispatchMediaKeyEvent(new android.view.KeyEvent(t, t, android.view.KeyEvent.ACTION_UP, key, 0));
     }
 
     private BluetoothManager manager() { return (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE); }
