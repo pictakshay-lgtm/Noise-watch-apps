@@ -44,7 +44,8 @@ final class GeminiClient {
     private static final String PREFS = "watchlink";
     private static final String KEY_PREF = "gemini_key";
     private static final String ALIAS = "healthwatcher.gemini";
-    private static final String[] MODELS = {"gemini-flash-latest", "gemini-2.5-flash"};
+    // Tried in order. gemini-2.5-flash was retired for new users; Google points to gemini-3.8-flash.
+    private static final String[] MODELS = {"gemini-flash-latest", "gemini-3.8-flash"};
     private static final String INSTRUCTION =
         "You are the assistant inside Health Watcher, a companion app for a smartwatch. "
         + "Reply in plain text, no markdown. First line: a very short answer for the watch screen, "
@@ -79,10 +80,14 @@ final class GeminiClient {
                 String key = loadKey(app);
                 if (key == null) error = "Add your Gemini key first.";
                 else {
+                    boolean busy = false;
                     for (int i = 0; i < MODELS.length && text == null; i++) {
                         try { text = request(app, key, MODELS[i], question); }
-                        catch (ModelMissing e) { if (i == MODELS.length - 1) error = "Gemini couldn't find a model for this key."; }
+                        catch (ModelMissing e) { /* try the next model */ }
+                        catch (ModelBusy e) { busy = true; /* overloaded: try the next model */ }
                     }
+                    if (text == null) error = busy ? "Gemini is busy right now (high demand). Try again in a minute."
+                        : "Gemini couldn't find a model for this key.";
                 }
             } catch (Friendly e) {
                 error = e.getMessage();
@@ -100,6 +105,7 @@ final class GeminiClient {
 
     private static final class Friendly extends Exception { Friendly(String m) { super(m); } }
     private static final class ModelMissing extends Exception { }
+    private static final class ModelBusy extends Exception { }
 
     private static String request(Context c, String key, String model, String question) throws Exception {
         URL url = new URL("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent");
@@ -126,6 +132,7 @@ final class GeminiClient {
             int code = http.getResponseCode();
             String reply = read(code >= 400 ? http.getErrorStream() : http.getInputStream());
             if (code == 404) throw new ModelMissing();
+            if (code == 503 || code == 500) throw new ModelBusy();
             if (code == 400 && reply.contains("API_KEY_INVALID")) throw new Friendly("That key didn't work. Check it in Google AI Studio and save it again.");
             if (code == 403) throw new Friendly("This key isn't allowed to use Gemini from Health Watcher. Check the key's restrictions (package and SHA-1) in Google Cloud.");
             if (code == 429) throw new Friendly("Gemini's usage limit was reached. Try again in a minute.");
