@@ -17,6 +17,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Ask Gemini (only when you type a question and have added your own key). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Call alerts on the watch (asked for only when you turn them on). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
