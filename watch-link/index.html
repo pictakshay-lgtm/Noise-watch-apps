@@ -102,6 +102,9 @@ label{display:grid;gap:5px;font:500 12.5px var(--body);color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 @media (max-width:440px){.stats{grid-template-columns:repeat(2,1fr)}}
 .stat{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.hrlog{list-style:none;margin:0;padding:0}
+.hrlog li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.hrlog b{color:var(--hr)}
 .stat b{display:block;font:600 22px/1.1 var(--display);font-variant-numeric:tabular-nums}
 .big{font:700 52px/1 var(--display);letter-spacing:-.02em;color:var(--hr);font-variant-numeric:tabular-nums}
 .big small{font:500 16px var(--mono);color:var(--muted);margin-left:6px}
@@ -331,6 +334,11 @@ li{margin:3px 0}
     </div>
     <button type="button" class="primary" id="measureBtn">Measure now</button>
     <p class="muted small" id="measureMsg" role="status">Asks the watch to take a reading (about 30 seconds).</p>
+    <div class="sect" id="hrLogBox" hidden>
+      <div class="head"><h4 class="eyebrow">Saved readings</h4><button type="button" class="text" id="hrLogClear">Clear</button></div>
+      <ol class="hrlog" id="hrLog"></ol>
+      <p class="muted small">Saved on this phone each time you tap Measure now. Health Watcher doesn't measure in the background.</p>
+    </div>
     <details class="help">
       <summary>About the resting estimate</summary>
       <p class="muted" style="font-size:13px">For a resting estimate, sit still for a few minutes. It's the lowest 1-minute average heart rate in this session. If the watch doesn't share live heart rate, start a workout on the watch; some models only share it then.</p>
@@ -992,6 +1000,34 @@ document.querySelectorAll("[data-tool]").forEach(btn => btn.onclick = async () =
   if (window.watchLinkNeedsWatch) window.watchLinkNeedsWatch();   // re-apply "needs a connected watch"
 });
 
+// ---------- saved readings (roadmap Task 4) ----------
+// Each Measure now result is kept on this phone (localStorage, newest last, at most 100) so the
+// history survives closing the app. Nothing is sent anywhere.
+const HR_LOG_KEY = "watchlink.hrlog", HR_LOG_MAX = 100;
+function loadReadings() { try { const a = JSON.parse(recall(HR_LOG_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (_) { return []; } }
+function saveReading(bpm) {
+  const all = loadReadings(); all.push({ t: Date.now(), bpm });
+  store(HR_LOG_KEY, JSON.stringify(all.slice(-HR_LOG_MAX))); renderReadings();
+}
+function renderReadings() {
+  const all = loadReadings(), today = new Date().toDateString();
+  $("hrLogBox").hidden = !all.length;
+  $("hrLog").innerHTML = all.slice(-10).reverse().map(r => {
+    const d = new Date(r.t), time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const day = d.toDateString() === today ? "Today" : d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+    return `<li><span>${esc(day)}, ${esc(time)}</span><b>${esc(r.bpm)} bpm</b></li>`;
+  }).join("");
+}
+// Two taps to clear (a WebView may not show confirm() dialogs).
+let clearArmed = null;
+$("hrLogClear").onclick = () => {
+  const btn = $("hrLogClear");
+  if (!clearArmed) { btn.textContent = "Tap again to clear"; clearArmed = setTimeout(() => { clearArmed = null; btn.textContent = "Clear"; }, 4000); return; }
+  clearTimeout(clearArmed); clearArmed = null; btn.textContent = "Clear";
+  store(HR_LOG_KEY, "[]"); renderReadings();
+};
+renderReadings();
+
 // ---------- measure on demand ----------
 // The Icon 2 doesn't stream the standard heart-rate characteristic. Instead, ask it to take a
 // reading with its own command (MoYoung CMD 0x6D: FE EA 20 06 6D 00 = start, ... FF = stop).
@@ -1017,7 +1053,7 @@ async function measureHr() {
     const b = bytesOf(ev.target.value);
     log("notify", FEE(3), b, "reply while measuring");
     if (b.length >= 6 && b[0] === 0xfe && b[1] === 0xea && b[4] === 0x6d && b[5] > 25 && b[5] < 230) {
-      hrSamples.push({ t: Date.now(), bpm: b[5] }); renderHr();
+      hrSamples.push({ t: Date.now(), bpm: b[5] }); renderHr(); saveReading(b[5]);
       finish(`Measured ${b[5]} bpm at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`);
     }
   };
